@@ -19,8 +19,10 @@ export default function RootLayout({
     <html lang="fr">
       <body className={`${inter.className} bg-gray-50 text-gray-900 antialiased`}>
         <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">{children}</main>
+          <div className="hidden lg:block">
+            <Sidebar />
+          </div>
+          <main className="flex-1 overflow-auto min-w-0">{children}</main>
         </div>
       </body>
     </html>
