@@ -206,10 +206,10 @@ export default function Home() {
               <div key={post.id} className="border-l-2 border-violet-200 pl-3">
                 <p className="text-sm text-gray-700 line-clamp-2">{post.contenu}</p>
                 <div className="flex gap-3 mt-1 text-xs text-gray-400">
-                  <span>👁 {post.vues.toLocaleString("fr-FR")}</span>
-                  <span>❤️ {post.likes}</span>
-                  <span>💬 {post.commentaires}</span>
-                  <span className="ml-auto text-violet-500 font-medium">
+                  <span>{post.vues.toLocaleString("fr-FR")} vues</span>
+                  <span>{post.likes} likes</span>
+                  <span>{post.commentaires} comm.</span>
+                  <span className="ml-auto text-indigo-500 font-medium">
                     {post.taux_engagement}%
                   </span>
                 </div>
