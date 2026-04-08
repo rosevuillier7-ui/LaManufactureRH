@@ -252,14 +252,14 @@ export default function Home() {
         </div>
 
         {/* Accès rapides IA */}
-        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl p-6 shadow-sm text-white">
-          <h2 className="font-semibold mb-4">🤖 Outils IA</h2>
-          <p className="text-sm text-indigo-200 mb-4">
+        <div className="bg-gray-950 rounded-2xl p-6 shadow-sm text-white border border-gray-800">
+          <h2 className="font-semibold mb-4">Outils IA</h2>
+          <p className="text-sm text-gray-400 mb-4">
             Accédez à vos assistants IA pour rédiger, analyser et préparer vos contenus.
           </p>
           <Link
             href="/outils-ia"
-            className="inline-block bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-medium px-4 py-2 rounded-lg"
+            className="inline-block bg-indigo-600 hover:bg-indigo-500 transition-colors text-white text-sm font-medium px-4 py-2 rounded-lg"
           >
             Ouvrir les outils →
           </Link>
