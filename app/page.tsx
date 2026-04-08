@@ -40,7 +40,7 @@ export default function Home() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Bonjour 👋</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Bonjour</h1>
         <p className="text-gray-500 mt-1">
           {new Date().toLocaleDateString("fr-FR", {
             weekday: "long",
@@ -149,7 +149,7 @@ export default function Home() {
         {/* Podcast derniers épisodes */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">🎙 13ème Mois</h2>
+            <h2 className="font-semibold text-gray-900">13ème Mois</h2>
             <Link href="/podcast" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
@@ -238,7 +238,6 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                📅{" "}
                 {new Date(prochainRdv.prochainRdv!).toLocaleDateString("fr-FR", {
                   weekday: "long",
                   day: "numeric",
@@ -253,7 +252,7 @@ export default function Home() {
 
         {/* Accès rapides IA */}
         <div className="bg-gray-950 rounded-2xl p-6 shadow-sm text-white border border-gray-800">
-          <h2 className="font-semibold mb-4">Outils IA</h2>
+          <h2 className="font-semibold mb-2">Outils IA</h2>
           <p className="text-sm text-gray-400 mb-4">
             Accédez à vos assistants IA pour rédiger, analyser et préparer vos contenus.
           </p>
