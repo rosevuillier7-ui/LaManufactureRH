@@ -77,7 +77,7 @@ export default function Home() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Missions actives</h2>
-            <Link href="/recrutement/missions" className="text-xs text-indigo-600 hover:underline">
+            <Link href="/recrutement/missions" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
           </div>
@@ -112,7 +112,7 @@ export default function Home() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Suivi coaching</h2>
-            <Link href="/coaching/coachees" className="text-xs text-indigo-600 hover:underline">
+            <Link href="/coaching/coachees" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
           </div>
@@ -150,7 +150,7 @@ export default function Home() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">🎙 13ème Mois</h2>
-            <Link href="/podcast" className="text-xs text-indigo-600 hover:underline">
+            <Link href="/podcast" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
           </div>
@@ -197,7 +197,7 @@ export default function Home() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">LinkedIn · Derniers posts</h2>
-            <Link href="/linkedin" className="text-xs text-indigo-600 hover:underline">
+            <Link href="/linkedin" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
           </div>
