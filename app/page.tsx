@@ -54,21 +54,21 @@ export default function Home() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
         <StatCard label="Clients actifs" value={clientsActifs} color="indigo" />
-        <StatCard label="Prospects actifs" value={prospectsActifs} color="sky" />
+        <StatCard label="Prospects actifs" value={prospectsActifs} color="amber" />
         <StatCard label="Missions ouvertes" value={missionsOuvertes} color="amber" />
-        <StatCard label="Candidats" value={data.candidats.length} color="sky" />
+        <StatCard label="Candidats" value={data.candidats.length} color="gray" />
         <StatCard label="Coachés actifs" value={coacheesActifs} color="emerald" />
         <StatCard
           label="Vues LinkedIn"
           value={totalVues.toLocaleString("fr-FR")}
           sub={`${data.posts.length} posts`}
-          color="violet"
+          color="indigo"
         />
         <StatCard
           label="Écoutes podcast"
           value={totalEcoutes.toLocaleString("fr-FR")}
           sub={`${episodesPubliés} épisodes`}
-          color="rose"
+          color="indigo"
         />
       </div>
 
