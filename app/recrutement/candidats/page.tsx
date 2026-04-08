@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Candidat, generateId, CandidatStatus } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllCandidats, createCandidat, updateCandidat, removeCandidat, getAllMissions } from "@/lib/db";
+import { Candidat, CandidatStatus, Mission, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
@@ -39,59 +41,68 @@ const emptyCandidat = (): Omit<Candidat, "id"> => ({
 });
 
 export default function CandidatsPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [candidats, setCandidats] = useState<Candidat[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Candidat | null>(null);
   const [form, setForm] = useState(emptyCandidat());
   const [filter, setFilter] = useState<CandidatStatus | "tous">("tous");
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const [c, m] = await Promise.all([getAllCandidats(), getAllMissions()]);
+    setCandidats(c);
+    setMissions(m);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("candidats-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "candidats" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptyCandidat()); setModal(true); }
   function openEdit(c: Candidat) { setEditing(c); setForm({ ...c }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let candidats: Candidat[];
+  async function save() {
     if (editing) {
-      candidats = data.candidats.map(c => c.id === editing.id ? { ...form, id: editing.id } : c);
+      await updateCandidat(editing.id, { ...form, id: editing.id });
     } else {
-      candidats = [...data.candidats, { ...form, id: generateId() }];
+      await createCandidat({ ...form, id: generateId() });
     }
-    const updated = { ...data, candidats };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function relancer(id: string) {
-    if (!data) return;
+  async function relancer(id: string) {
     const today = new Date().toISOString().split("T")[0];
-    const candidats = data.candidats.map(c =>
-      c.id === id ? { ...c, dernierContact: today, statut: "contacté" as CandidatStatus } : c
-    );
-    const updated = { ...data, candidats };
-    saveData(updated);
-    setData(updated);
+    const candidat = candidats.find(c => c.id === id);
+    if (!candidat) return;
+    await updateCandidat(id, { ...candidat, dernierContact: today, statut: "contacté" });
+    await load();
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer ce candidat ?")) return;
-    const updated = { ...data, candidats: data.candidats.filter(c => c.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer ce candidat ?")) return;
+    await removeCandidat(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
-  const filtered = filter === "tous" ? data.candidats : data.candidats.filter(c => c.statut === filter);
+  const filtered = filter === "tous" ? candidats : candidats.filter(c => c.statut === filter);
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Candidats</h1>
-          <p className="text-gray-500 mt-1">{data.candidats.length} profils dans le vivier</p>
+          <p className="text-gray-500 mt-1">{candidats.length} profils dans le vivier</p>
         </div>
         <button onClick={openAdd} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <PlusIcon className="w-4 h-4" /> Nouveau candidat
@@ -113,7 +124,7 @@ export default function CandidatsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(candidat => {
-          const mission = data.missions.find(m => m.id === candidat.missionId);
+          const mission = missions.find(m => m.id === candidat.missionId);
           const contactDate = candidat.dernierContact || candidat.dateAjout;
           const overdue = daysSince(contactDate) > 5;
           return (
@@ -224,7 +235,7 @@ export default function CandidatsPage() {
                 <label className="text-xs font-medium text-gray-500 block mb-1">Mission liée</label>
                 <select className="input" value={form.missionId} onChange={e => setForm(f => ({ ...f, missionId: e.target.value }))}>
                   <option value="">Aucune</option>
-                  {data.missions.map(m => <option key={m.id} value={m.id}>{m.titre}</option>)}
+                  {missions.map(m => <option key={m.id} value={m.id}>{m.titre}</option>)}
                 </select>
               </div>
               <div className="col-span-2">

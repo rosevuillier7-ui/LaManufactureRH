@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Mission, generateId, MissionStatus } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllMissions, createMission, updateMission, removeMission, getAllClients } from "@/lib/db";
+import { Mission, MissionStatus, Client, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
@@ -30,45 +32,57 @@ const emptyMission = (): Omit<Mission, "id"> => ({
 });
 
 export default function MissionsPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Mission | null>(null);
   const [form, setForm] = useState(emptyMission());
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const [m, c] = await Promise.all([getAllMissions(), getAllClients()]);
+    setMissions(m);
+    setClients(c);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("missions-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptyMission()); setModal(true); }
   function openEdit(m: Mission) { setEditing(m); setForm({ ...m }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let missions: Mission[];
+  async function save() {
     if (editing) {
-      missions = data.missions.map(m => m.id === editing.id ? { ...form, id: editing.id } : m);
+      await updateMission(editing.id, { ...form, id: editing.id });
     } else {
-      missions = [...data.missions, { ...form, id: generateId() }];
+      await createMission({ ...form, id: generateId() });
     }
-    const updated = { ...data, missions };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer cette mission ?")) return;
-    const updated = { ...data, missions: data.missions.filter(m => m.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer cette mission ?")) return;
+    await removeMission(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Missions</h1>
-          <p className="text-gray-500 mt-1">{data.missions.length} missions au total</p>
+          <p className="text-gray-500 mt-1">{missions.length} missions au total</p>
         </div>
         <button onClick={openAdd} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <PlusIcon className="w-4 h-4" /> Nouvelle mission
@@ -89,8 +103,8 @@ export default function MissionsPage() {
             </tr>
           </thead>
           <tbody>
-            {data.missions.map(mission => {
-              const client = data.clients.find(c => c.id === mission.clientId);
+            {missions.map(mission => {
+              const client = clients.find(c => c.id === mission.clientId);
               return (
                 <tr key={mission.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
@@ -136,7 +150,7 @@ export default function MissionsPage() {
                 <label className="text-xs font-medium text-gray-500 block mb-1">Client</label>
                 <select className="input" value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
                   <option value="">Sélectionner</option>
-                  {data.clients.map(c => <option key={c.id} value={c.id}>{c.entreprise}</option>)}
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.entreprise}</option>)}
                 </select>
               </div>
               <div>

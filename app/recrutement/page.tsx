@@ -1,19 +1,42 @@
 "use client";
 import { useEffect, useState } from "react";
-import { loadData, AppData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllClients, getAllMissions, getAllCandidats } from "@/lib/db";
+import { Client, Mission, Candidat } from "@/lib/store";
 import StatCard from "@/components/StatCard";
 import Link from "next/link";
-import Badge from "@/components/Badge";
 
 export default function RecrutementPage() {
-  const [data, setData] = useState<AppData | null>(null);
-  useEffect(() => { setData(loadData()); }, []);
-  if (!data) return null;
+  const [clients, setClients] = useState<Client[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [candidats, setCandidats] = useState<Candidat[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const clientsActifs = data.clients.filter(c => c.statut === "actif").length;
-  const missionsEnCours = data.missions.filter(m => m.statut === "en_cours").length;
-  const missionsOuvertes = data.missions.filter(m => m.statut === "ouverte").length;
-  const candidatsPrésentés = data.candidats.filter(c => c.statut === "présenté" || c.statut === "retenu").length;
+  async function load() {
+    const [cl, mi, ca] = await Promise.all([getAllClients(), getAllMissions(), getAllCandidats()]);
+    setClients(cl);
+    setMissions(mi);
+    setCandidats(ca);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("recrutement-overview")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "candidats" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  if (loading) return null;
+
+  const clientsActifs = clients.filter(c => c.statut === "actif").length;
+  const missionsEnCours = missions.filter(m => m.statut === "en_cours").length;
+  const missionsOuvertes = missions.filter(m => m.statut === "ouverte").length;
+  const candidatsPrésentés = candidats.filter(c => c.statut === "présenté" || c.statut === "retenu").length;
 
   return (
     <div className="p-8">
@@ -31,17 +54,17 @@ export default function RecrutementPage() {
         <Link href="/recrutement/clients" className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow group">
           <div className="text-3xl mb-3">🏢</div>
           <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Clients</h3>
-          <p className="text-sm text-gray-500 mt-1">{data.clients.length} clients enregistrés</p>
+          <p className="text-sm text-gray-500 mt-1">{clients.length} clients enregistrés</p>
         </Link>
         <Link href="/recrutement/missions" className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow group">
           <div className="text-3xl mb-3">📋</div>
           <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Missions</h3>
-          <p className="text-sm text-gray-500 mt-1">{data.missions.length} missions au total</p>
+          <p className="text-sm text-gray-500 mt-1">{missions.length} missions au total</p>
         </Link>
         <Link href="/recrutement/candidats" className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow group">
           <div className="text-3xl mb-3">👤</div>
           <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Candidats</h3>
-          <p className="text-sm text-gray-500 mt-1">{data.candidats.length} profils dans le vivier</p>
+          <p className="text-sm text-gray-500 mt-1">{candidats.length} profils dans le vivier</p>
         </Link>
       </div>
     </div>

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Coachee, generateId, CoachingStatut } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllCoachees, createCoachee, updateCoachee, removeCoachee, getAllSessions } from "@/lib/db";
+import { Coachee, CoachingStatut, Session, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
@@ -32,45 +34,57 @@ const emptyCoachee = (): Omit<Coachee, "id"> => ({
 });
 
 export default function CoacheesPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [coachees, setCoachees] = useState<Coachee[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Coachee | null>(null);
   const [form, setForm] = useState(emptyCoachee());
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const [c, s] = await Promise.all([getAllCoachees(), getAllSessions()]);
+    setCoachees(c);
+    setSessions(s);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("coachees-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "coachees" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptyCoachee()); setModal(true); }
   function openEdit(c: Coachee) { setEditing(c); setForm({ ...c }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let coachees: Coachee[];
+  async function save() {
     if (editing) {
-      coachees = data.coachees.map(c => c.id === editing.id ? { ...form, id: editing.id } : c);
+      await updateCoachee(editing.id, { ...form, id: editing.id });
     } else {
-      coachees = [...data.coachees, { ...form, id: generateId() }];
+      await createCoachee({ ...form, id: generateId() });
     }
-    const updated = { ...data, coachees };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer ce coaché ?")) return;
-    const updated = { ...data, coachees: data.coachees.filter(c => c.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer ce coaché ?")) return;
+    await removeCoachee(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mes coachés</h1>
-          <p className="text-gray-500 mt-1">{data.coachees.length} accompagnements</p>
+          <p className="text-gray-500 mt-1">{coachees.length} accompagnements</p>
         </div>
         <button onClick={openAdd} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <PlusIcon className="w-4 h-4" /> Nouveau coaché
@@ -78,9 +92,9 @@ export default function CoacheesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {data.coachees.map(coachee => {
+        {coachees.map(coachee => {
           const pct = Math.round((coachee.seancesFaites / coachee.nbSeances) * 100);
-          const coacheeSessions = data.sessions.filter(s => s.coacheeId === coachee.id);
+          const coacheeSessions = sessions.filter(s => s.coacheeId === coachee.id);
           const lastSession = coacheeSessions.sort((a, b) => b.date.localeCompare(a.date))[0];
 
           return (

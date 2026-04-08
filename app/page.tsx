@@ -1,39 +1,80 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, AppData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import {
+  getAllClients, getAllMissions, getAllCandidats, getAllCoachees,
+  getAllSessions, getAllPosts, getAllEpisodes, getAllProspects,
+} from "@/lib/db";
+import { Client, Mission, Candidat, Coachee, Session, PostLinkedIn, Episode, Prospect } from "@/lib/store";
 import StatCard from "@/components/StatCard";
 import Badge from "@/components/Badge";
 import Link from "next/link";
 
 export default function Home() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [candidats, setCandidats] = useState<Candidat[]>([]);
+  const [coachees, setCoachees] = useState<Coachee[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [posts, setPosts] = useState<PostLinkedIn[]>([]);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    const [cl, mi, ca, co, se, po, ep, pr] = await Promise.all([
+      getAllClients(), getAllMissions(), getAllCandidats(), getAllCoachees(),
+      getAllSessions(), getAllPosts(), getAllEpisodes(), getAllProspects(),
+    ]);
+    setClients(cl);
+    setMissions(mi);
+    setCandidats(ca);
+    setCoachees(co);
+    setSessions(se);
+    setPosts(po);
+    setEpisodes(ep);
+    setProspects(pr);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    setData(loadData());
+    load();
+    const channel = supabase
+      .channel("dashboard-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "candidats" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "coachees" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "linkedin_posts" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "podcast_episodes" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  if (!data) return null;
+  if (loading) return null;
 
-  const missionsOuvertes = data.missions.filter(
+  const missionsOuvertes = missions.filter(
     (m) => m.statut === "ouverte" || m.statut === "en_cours"
   ).length;
-  const clientsActifs = data.clients.filter((c) => c.statut === "actif").length;
-  const coacheesActifs = data.coachees.filter((c) => c.statut === "actif").length;
-  const prospectsActifs = (data.prospects || []).filter(
+  const clientsActifs = clients.filter((c) => c.statut === "actif").length;
+  const coacheesActifs = coachees.filter((c) => c.statut === "actif").length;
+  const prospectsActifs = prospects.filter(
     (p) => p.statut !== "Signé" && p.statut !== "Perdu"
   ).length;
-  const totalVues = data.posts.reduce((sum, p) => sum + p.vues, 0);
-  const totalEcoutes = data.episodes.reduce((sum, e) => sum + e.ecoutes, 0);
-  const episodesPubliés = data.episodes.filter((e) => e.statut === "publié").length;
+  const totalVues = posts.reduce((sum, p) => sum + p.vues, 0);
+  const totalEcoutes = episodes.reduce((sum, e) => sum + e.ecoutes, 0);
+  const episodesPubliés = episodes.filter((e) => e.statut === "publié").length;
 
   const today = new Date().toISOString().split("T")[0];
-  const prochainRdv = data.sessions
+  const prochainRdv = sessions
     .filter((s) => s.prochainRdv && s.prochainRdv >= today)
     .sort((a, b) => (a.prochainRdv! > b.prochainRdv! ? 1 : -1))[0];
 
   const prochainCoachee = prochainRdv
-    ? data.coachees.find((c) => c.id === prochainRdv.coacheeId)
+    ? coachees.find((c) => c.id === prochainRdv.coacheeId)
     : null;
 
   return (
@@ -56,12 +97,12 @@ export default function Home() {
         <StatCard label="Clients actifs" value={clientsActifs} color="indigo" />
         <StatCard label="Prospects actifs" value={prospectsActifs} color="amber" />
         <StatCard label="Missions ouvertes" value={missionsOuvertes} color="amber" />
-        <StatCard label="Candidats" value={data.candidats.length} color="gray" />
+        <StatCard label="Candidats" value={candidats.length} color="gray" />
         <StatCard label="Coachés actifs" value={coacheesActifs} color="emerald" />
         <StatCard
           label="Vues LinkedIn"
           value={totalVues.toLocaleString("fr-FR")}
-          sub={`${data.posts.length} posts`}
+          sub={`${posts.length} posts`}
           color="indigo"
         />
         <StatCard
@@ -82,10 +123,10 @@ export default function Home() {
             </Link>
           </div>
           <div className="space-y-3">
-            {data.missions
+            {missions
               .filter((m) => m.statut === "ouverte" || m.statut === "en_cours")
               .map((mission) => {
-                const client = data.clients.find((c) => c.id === mission.clientId);
+                const client = clients.find((c) => c.id === mission.clientId);
                 return (
                   <div key={mission.id} className="flex items-start gap-3">
                     <div className="w-2 h-2 mt-2 rounded-full bg-amber-400 flex-shrink-0" />
@@ -117,7 +158,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="space-y-3">
-            {data.coachees
+            {coachees
               .filter((c) => c.statut === "actif")
               .map((coachee) => {
                 const pct = Math.round((coachee.seancesFaites / coachee.nbSeances) * 100);
@@ -155,7 +196,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="space-y-3">
-            {data.episodes
+            {episodes
               .slice(-3)
               .reverse()
               .map((ep) => (
@@ -202,7 +243,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="space-y-3">
-            {data.posts.slice(0, 3).map((post) => (
+            {posts.slice(0, 3).map((post) => (
               <div key={post.id} className="border-b border-gray-50 pb-3 last:border-b-0 last:pb-0">
                 <p className="text-sm text-gray-700 line-clamp-2">{post.contenu}</p>
                 <div className="flex gap-3 mt-1 text-xs text-gray-400">

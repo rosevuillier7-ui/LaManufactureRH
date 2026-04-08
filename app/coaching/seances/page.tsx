@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Session, generateId } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllSessions, createSession, updateSession, removeSession, getAllCoachees } from "@/lib/db";
+import { Session, Coachee, generateId } from "@/lib/store";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 const emptySession = (): Omit<Session, "id"> => ({
@@ -14,47 +16,59 @@ const emptySession = (): Omit<Session, "id"> => ({
 });
 
 export default function SeancesPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [coachees, setCoachees] = useState<Coachee[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Session | null>(null);
   const [form, setForm] = useState(emptySession());
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const [s, c] = await Promise.all([getAllSessions(), getAllCoachees()]);
+    setSessions(s);
+    setCoachees(c);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("seances-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "coachees" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptySession()); setModal(true); }
-  function openEdit(s: Session) { setEditing(s); setForm({ ...s }); setModal(true); }
+  function openEdit(s: Session) { setEditing(s); setForm({ ...s, prochainRdv: s.prochainRdv ?? "" }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let sessions: Session[];
+  async function save() {
     if (editing) {
-      sessions = data.sessions.map(s => s.id === editing.id ? { ...form, id: editing.id } : s);
+      await updateSession(editing.id, { ...form, id: editing.id });
     } else {
-      sessions = [...data.sessions, { ...form, id: generateId() }];
+      await createSession({ ...form, id: generateId() });
     }
-    const updated = { ...data, sessions };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer cette séance ?")) return;
-    const updated = { ...data, sessions: data.sessions.filter(s => s.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer cette séance ?")) return;
+    await removeSession(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
-  const sorted = [...data.sessions].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...sessions].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Séances de coaching</h1>
-          <p className="text-gray-500 mt-1">{data.sessions.length} séances enregistrées</p>
+          <p className="text-gray-500 mt-1">{sessions.length} séances enregistrées</p>
         </div>
         <button onClick={openAdd} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <PlusIcon className="w-4 h-4" /> Nouvelle séance
@@ -63,7 +77,7 @@ export default function SeancesPage() {
 
       <div className="space-y-4">
         {sorted.map(session => {
-          const coachee = data.coachees.find(c => c.id === session.coacheeId);
+          const coachee = coachees.find(c => c.id === session.coacheeId);
           return (
             <div key={session.id} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
               <div className="flex items-start gap-4">
@@ -108,7 +122,7 @@ export default function SeancesPage() {
             </div>
           );
         })}
-        {data.sessions.length === 0 && (
+        {sessions.length === 0 && (
           <div className="text-center py-12 text-gray-400">
             <p className="text-4xl mb-3">📅</p>
             <p>Aucune séance enregistrée</p>
@@ -125,7 +139,7 @@ export default function SeancesPage() {
                 <label className="text-xs font-medium text-gray-500 block mb-1">Coaché</label>
                 <select className="input" value={form.coacheeId} onChange={e => setForm(f => ({ ...f, coacheeId: e.target.value }))}>
                   <option value="">Sélectionner</option>
-                  {data.coachees.map(c => <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>)}
+                  {coachees.map(c => <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>)}
                 </select>
               </div>
               <div>
@@ -146,7 +160,7 @@ export default function SeancesPage() {
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-medium text-gray-500 block mb-1">Prochain RDV</label>
-                <input className="input" type="date" value={form.prochainRdv} onChange={e => setForm(f => ({ ...f, prochainRdv: e.target.value }))} />
+                <input className="input" type="date" value={form.prochainRdv ?? ""} onChange={e => setForm(f => ({ ...f, prochainRdv: e.target.value }))} />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

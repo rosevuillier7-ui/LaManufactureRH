@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Client, generateId, ClientStatus } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllClients, createClient, updateClient, removeClient } from "@/lib/db";
+import { Client, ClientStatus, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
@@ -29,54 +31,56 @@ const emptyClient = (): Omit<Client, "id"> => ({
 });
 
 export default function ClientsPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyClient());
 
-  useEffect(() => { setData(loadData()); }, []);
-
-  function openAdd() {
-    setEditing(null);
-    setForm(emptyClient());
-    setModal(true);
+  async function load() {
+    const data = await getAllClients();
+    setClients(data);
+    setLoading(false);
   }
 
-  function openEdit(c: Client) {
-    setEditing(c);
-    setForm({ ...c });
-    setModal(true);
-  }
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("clients-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => {
+        getAllClients().then(setClients);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
-  function save() {
-    if (!data) return;
-    let clients: Client[];
+  function openAdd() { setEditing(null); setForm(emptyClient()); setModal(true); }
+  function openEdit(c: Client) { setEditing(c); setForm({ ...c }); setModal(true); }
+
+  async function save() {
     if (editing) {
-      clients = data.clients.map(c => c.id === editing.id ? { ...form, id: editing.id } : c);
+      await updateClient(editing.id, { ...form, id: editing.id });
     } else {
-      clients = [...data.clients, { ...form, id: generateId() }];
+      await createClient({ ...form, id: generateId() });
     }
-    const updated = { ...data, clients };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer ce client ?")) return;
-    const updated = { ...data, clients: data.clients.filter(c => c.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer ce client ?")) return;
+    await removeClient(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-          <p className="text-gray-500 mt-1">{data.clients.length} clients enregistrés</p>
+          <p className="text-gray-500 mt-1">{clients.length} clients enregistrés</p>
         </div>
         <button
           onClick={openAdd}
@@ -99,7 +103,7 @@ export default function ClientsPage() {
             </tr>
           </thead>
           <tbody>
-            {data.clients.map(client => (
+            {clients.map(client => (
               <tr key={client.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 font-medium text-gray-900">{client.entreprise}</td>
                 <td className="px-6 py-4 text-gray-600">{client.contact}</td>

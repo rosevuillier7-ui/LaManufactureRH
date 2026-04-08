@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Episode, generateId } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllEpisodes, createEpisode, updateEpisode, removeEpisode } from "@/lib/db";
+import { Episode, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import StatCard from "@/components/StatCard";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -34,48 +36,59 @@ const emptyEpisode = (nb: number): Omit<Episode, "id"> => ({
 });
 
 export default function PodcastPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Episode | null>(null);
   const [form, setForm] = useState(emptyEpisode(1));
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const data = await getAllEpisodes();
+    setEpisodes(data);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("episodes-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "podcast_episodes" }, () => {
+        getAllEpisodes().then(setEpisodes);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() {
-    const next = data ? Math.max(0, ...data.episodes.map(e => e.numero)) + 1 : 1;
+    const next = episodes.length ? Math.max(...episodes.map(e => e.numero)) + 1 : 1;
     setEditing(null);
     setForm(emptyEpisode(next));
     setModal(true);
   }
   function openEdit(e: Episode) { setEditing(e); setForm({ ...e }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let episodes: Episode[];
+  async function save() {
     if (editing) {
-      episodes = data.episodes.map(e => e.id === editing.id ? { ...form, id: editing.id } : e);
+      await updateEpisode(editing.id, { ...form, id: editing.id });
     } else {
-      episodes = [...data.episodes, { ...form, id: generateId() }];
+      await createEpisode({ ...form, id: generateId() });
     }
-    const updated = { ...data, episodes };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer cet épisode ?")) return;
-    const updated = { ...data, episodes: data.episodes.filter(e => e.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer cet épisode ?")) return;
+    await removeEpisode(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
-  const published = data.episodes.filter(e => e.statut === "publié");
+  const published = episodes.filter(e => e.statut === "publié");
   const totalEcoutes = published.reduce((s, e) => s + e.ecoutes, 0);
   const avgEcoutes = published.length ? Math.round(totalEcoutes / published.length) : 0;
-  const sorted = [...data.episodes].sort((a, b) => b.numero - a.numero);
+  const sorted = [...episodes].sort((a, b) => b.numero - a.numero);
 
   return (
     <div className="p-8">
@@ -93,7 +106,7 @@ export default function PodcastPage() {
         <StatCard label="Épisodes publiés" value={published.length} color="rose" />
         <StatCard label="Total écoutes" value={totalEcoutes.toLocaleString("fr-FR")} color="amber" />
         <StatCard label="Moy. écoutes / épisode" value={avgEcoutes.toLocaleString("fr-FR")} color="sky" />
-        <StatCard label="En préparation" value={data.episodes.filter(e => e.statut !== "publié").length} color="gray" />
+        <StatCard label="En préparation" value={episodes.filter(e => e.statut !== "publié").length} color="gray" />
       </div>
 
       <div className="flex items-center justify-between mb-4">

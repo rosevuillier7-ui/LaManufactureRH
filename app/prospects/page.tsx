@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, Prospect, ProspectStatus, generateId } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { getAllProspects, createProspect, updateProspect, removeProspect } from "@/lib/db";
+import { Prospect, ProspectStatus, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 
@@ -37,43 +39,54 @@ const emptyProspect = (): Omit<Prospect, "id"> => ({
 });
 
 export default function ProspectsPage() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Prospect | null>(null);
   const [form, setForm] = useState(emptyProspect());
   const [filter, setFilter] = useState<ProspectStatus | "tous">("tous");
 
-  useEffect(() => { setData(loadData()); }, []);
+  async function load() {
+    const data = await getAllProspects();
+    setProspects(data);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("prospects-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => {
+        getAllProspects().then(setProspects);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptyProspect()); setModal(true); }
   function openEdit(p: Prospect) { setEditing(p); setForm({ ...p }); setModal(true); }
 
-  function save() {
-    if (!data) return;
-    let prospects: Prospect[];
+  async function save() {
     if (editing) {
-      prospects = data.prospects.map(p => p.id === editing.id ? { ...form, id: editing.id } : p);
+      await updateProspect(editing.id, { ...form, id: editing.id });
     } else {
-      prospects = [...data.prospects, { ...form, id: generateId() }];
+      await createProspect({ ...form, id: generateId() });
     }
-    const updated = { ...data, prospects };
-    saveData(updated);
-    setData(updated);
+    await load();
     setModal(false);
   }
 
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer ce prospect ?")) return;
-    const updated = { ...data, prospects: data.prospects.filter(p => p.id !== id) };
-    saveData(updated);
-    setData(updated);
+  async function remove(id: string) {
+    if (!confirm("Supprimer ce prospect ?")) return;
+    await removeProspect(id);
+    await load();
   }
 
-  if (!data) return null;
+  if (loading) return null;
 
   const filtered = filter === "tous"
-    ? data.prospects
-    : data.prospects.filter(p => p.statut === filter);
+    ? prospects
+    : prospects.filter(p => p.statut === filter);
 
   const isInactive = (p: Prospect) => p.statut === "Signé" || p.statut === "Perdu";
   const isOverdue = (p: Prospect) => !isInactive(p) && daysSince(p.dernierContact) > 7;
@@ -84,7 +97,7 @@ export default function ProspectsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Prospects</h1>
           <p className="text-gray-500 mt-1">
-            {data.prospects.filter(p => !isInactive(p)).length} prospects actifs
+            {prospects.filter(p => !isInactive(p)).length} prospects actifs
           </p>
         </div>
         <button
