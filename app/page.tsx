@@ -203,7 +203,7 @@ export default function Home() {
           </div>
           <div className="space-y-3">
             {data.posts.slice(0, 3).map((post) => (
-              <div key={post.id} className="border-l-2 border-violet-200 pl-3">
+              <div key={post.id} className="border-b border-gray-50 pb-3 last:border-b-0 last:pb-0">
                 <p className="text-sm text-gray-700 line-clamp-2">{post.contenu}</p>
                 <div className="flex gap-3 mt-1 text-xs text-gray-400">
                   <span>{post.vues.toLocaleString("fr-FR")} vues</span>
