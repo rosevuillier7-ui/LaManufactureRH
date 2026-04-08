@@ -10,6 +10,7 @@ import {
   MicrophoneIcon,
   CpuChipIcon,
   ChevronRightIcon,
+  BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
 
 const nav = [
@@ -27,6 +28,11 @@ const nav = [
       { label: "Missions", href: "/recrutement/missions" },
       { label: "Candidats", href: "/recrutement/candidats" },
     ],
+  },
+  {
+    label: "Prospects",
+    href: "/prospects",
+    icon: BuildingOffice2Icon,
   },
   {
     label: "Coaching",

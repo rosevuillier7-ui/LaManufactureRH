@@ -20,6 +20,9 @@ export default function Home() {
   ).length;
   const clientsActifs = data.clients.filter((c) => c.statut === "actif").length;
   const coacheesActifs = data.coachees.filter((c) => c.statut === "actif").length;
+  const prospectsActifs = (data.prospects || []).filter(
+    (p) => p.statut !== "Signé" && p.statut !== "Perdu"
+  ).length;
   const totalVues = data.posts.reduce((sum, p) => sum + p.vues, 0);
   const totalEcoutes = data.episodes.reduce((sum, e) => sum + e.ecoutes, 0);
   const episodesPubliés = data.episodes.filter((e) => e.statut === "publié").length;
@@ -49,8 +52,9 @@ export default function Home() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
         <StatCard label="Clients actifs" value={clientsActifs} color="indigo" />
+        <StatCard label="Prospects actifs" value={prospectsActifs} color="sky" />
         <StatCard label="Missions ouvertes" value={missionsOuvertes} color="amber" />
         <StatCard label="Candidats" value={data.candidats.length} color="sky" />
         <StatCard label="Coachés actifs" value={coacheesActifs} color="emerald" />

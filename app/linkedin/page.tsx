@@ -1,214 +1,219 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { loadData, saveData, AppData, PostLinkedIn, generateId } from "@/lib/store";
-import Badge from "@/components/Badge";
-import StatCard from "@/components/StatCard";
-import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
 
-type Format = PostLinkedIn["format"];
-const formatLabel: Record<Format, string> = {
-  texte: "Texte",
-  carousel: "Carousel",
-  video: "Vidéo",
-  image: "Image",
-  article: "Article",
-};
-const formatVariant: Record<Format, "gray" | "blue" | "purple" | "yellow" | "indigo"> = {
-  texte: "gray",
-  carousel: "blue",
-  video: "purple",
-  image: "yellow",
-  article: "indigo",
-};
+type Angle = "Conseil pratique" | "Storytelling" | "Opinion" | "Retour d'expérience" | "Cas client";
+type Ton = "Professionnel" | "Direct et cash" | "Inspirant";
+type Longueur = "Court 150 mots" | "Moyen 300 mots" | "Long 500 mots";
 
-const emptyPost = (): Omit<PostLinkedIn, "id"> => ({
-  date: new Date().toISOString().split("T")[0],
-  contenu: "",
-  format: "texte",
-  vues: 0,
-  likes: 0,
-  commentaires: 0,
-  partages: 0,
-  taux_engagement: 0,
-  tags: [],
-});
+const SYSTEM_PROMPT = `Tu es un expert en personal branding LinkedIn spécialisé dans les métiers RH. Tu écris pour Flaubert Vuillier, fondateur de La Manufacture RH, cabinet de recrutement et coaching RH. Son ton est direct, professionnel et ancré dans le terrain. Il parle à des DRH, managers et dirigeants. Ses sujets de prédilection : recrutement, management, leadership, marché du travail, coaching de dirigeants. Tu génères des posts LinkedIn engageants, sans hashtags excessifs, sans emojis en excès, avec une accroche forte en première ligne.`;
+
+const longueurMap: Record<Longueur, string> = {
+  "Court 150 mots": "environ 150 mots",
+  "Moyen 300 mots": "environ 300 mots",
+  "Long 500 mots": "environ 500 mots",
+};
 
 export default function LinkedInPage() {
-  const [data, setData] = useState<AppData | null>(null);
-  const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState<PostLinkedIn | null>(null);
-  const [form, setForm] = useState(emptyPost());
-  const [tagsInput, setTagsInput] = useState("");
+  const [sujet, setSujet] = useState("");
+  const [angle, setAngle] = useState<Angle>("Conseil pratique");
+  const [ton, setTon] = useState<Ton>("Professionnel");
+  const [longueur, setLongueur] = useState<Longueur>("Moyen 300 mots");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("anthropic_api_key") || "";
+    return "";
+  });
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [tempKey, setTempKey] = useState("");
 
-  useEffect(() => { setData(loadData()); }, []);
-
-  function openAdd() { setEditing(null); setForm(emptyPost()); setTagsInput(""); setModal(true); }
-  function openEdit(p: PostLinkedIn) {
-    setEditing(p);
-    setForm({ ...p });
-    setTagsInput(p.tags.join(", "));
-    setModal(true);
+  function saveApiKey() {
+    localStorage.setItem("anthropic_api_key", tempKey);
+    setApiKey(tempKey);
+    setShowApiModal(false);
   }
 
-  function save() {
-    if (!data) return;
-    const tags = tagsInput.split(",").map(t => t.trim()).filter(Boolean);
-    const totalInteractions = form.likes + form.commentaires + form.partages;
-    const taux = form.vues > 0 ? Math.round((totalInteractions / form.vues) * 1000) / 10 : 0;
-    const post = { ...form, tags, taux_engagement: taux };
+  async function generate() {
+    if (!sujet.trim()) return;
+    if (!apiKey) { setTempKey(""); setShowApiModal(true); return; }
 
-    let posts: PostLinkedIn[];
-    if (editing) {
-      posts = data.posts.map(p => p.id === editing.id ? { ...post, id: editing.id } : p);
-    } else {
-      posts = [...data.posts, { ...post, id: generateId() }];
+    setLoading(true);
+    setOutput("");
+
+    const userMessage = `Sujet : ${sujet}\nAngle : ${angle}\nTon : ${ton}\nLongueur : ${longueurMap[longueur]}\n\nGénère le post LinkedIn.`;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 1500,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setOutput(`Erreur API : ${err.error?.message || res.statusText}`);
+        return;
+      }
+
+      const data = await res.json();
+      setOutput(data.content[0]?.text || "");
+    } catch (e) {
+      setOutput(`Erreur réseau : ${String(e)}`);
+    } finally {
+      setLoading(false);
     }
-    const updated = { ...data, posts };
-    saveData(updated);
-    setData(updated);
-    setModal(false);
   }
-
-  function remove(id: string) {
-    if (!data || !confirm("Supprimer ce post ?")) return;
-    const updated = { ...data, posts: data.posts.filter(p => p.id !== id) };
-    saveData(updated);
-    setData(updated);
-  }
-
-  if (!data) return null;
-
-  const posts = [...data.posts].sort((a, b) => b.date.localeCompare(a.date));
-  const totalVues = posts.reduce((s, p) => s + p.vues, 0);
-  const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
-  const totalCommentaires = posts.reduce((s, p) => s + p.commentaires, 0);
-  const avgEngagement = posts.length
-    ? Math.round(posts.reduce((s, p) => s + p.taux_engagement, 0) / posts.length * 10) / 10
-    : 0;
-
-  const bestPost = posts.reduce((best, p) => (!best || p.vues > best.vues ? p : best), null as PostLinkedIn | null);
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">LinkedIn</h1>
-        <p className="text-gray-500 mt-1">Analyse de vos performances de contenu</p>
-      </div>
-
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total vues" value={totalVues.toLocaleString("fr-FR")} sub={`${posts.length} posts`} color="violet" />
-        <StatCard label="Total likes" value={totalLikes.toLocaleString("fr-FR")} color="rose" />
-        <StatCard label="Commentaires" value={totalCommentaires.toLocaleString("fr-FR")} color="sky" />
-        <StatCard label="Engagement moyen" value={`${avgEngagement}%`} color="emerald" />
-      </div>
-
-      {bestPost && (
-        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white">
-          <p className="text-sm font-medium text-violet-200 mb-2">🏆 Meilleur post</p>
-          <p className="font-semibold line-clamp-2">{bestPost.contenu}</p>
-          <div className="flex gap-4 mt-3 text-sm text-violet-200">
-            <span>👁 {bestPost.vues.toLocaleString("fr-FR")} vues</span>
-            <span>❤️ {bestPost.likes} likes</span>
-            <span>💬 {bestPost.commentaires} commentaires</span>
-            <span className="text-white font-medium ml-auto">{bestPost.taux_engagement}% engagement</span>
-          </div>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Générateur LinkedIn</h1>
+          <p className="text-gray-500 mt-1">Créez des posts LinkedIn percutants avec l'IA</p>
         </div>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-gray-900">Tous les posts</h2>
-        <button onClick={openAdd} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <PlusIcon className="w-4 h-4" /> Ajouter un post
+        <button
+          onClick={() => { setTempKey(apiKey); setShowApiModal(true); }}
+          className="text-xs text-gray-400 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        >
+          🔑 {apiKey ? "Clé API configurée" : "Configurer clé API"}
         </button>
       </div>
 
-      <div className="space-y-3">
-        {posts.map(post => (
-          <div key={post.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs text-gray-400">
-                    {new Date(post.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-                  </span>
-                  <Badge label={formatLabel[post.format]} variant={formatVariant[post.format]} />
-                  {post.tags.map(tag => (
-                    <span key={tag} className="text-xs text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">#{tag}</span>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-700 line-clamp-3">{post.contenu}</p>
-                <div className="flex gap-4 mt-3 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">👁 <strong className="text-gray-700">{post.vues.toLocaleString("fr-FR")}</strong></span>
-                  <span className="flex items-center gap-1">❤️ <strong className="text-gray-700">{post.likes}</strong></span>
-                  <span className="flex items-center gap-1">💬 <strong className="text-gray-700">{post.commentaires}</strong></span>
-                  <span className="flex items-center gap-1">🔁 <strong className="text-gray-700">{post.partages}</strong></span>
-                  <div className="ml-auto flex items-center gap-1">
-                    <div className={`w-2 h-2 rounded-full ${post.taux_engagement >= 5 ? "bg-emerald-500" : post.taux_engagement >= 3 ? "bg-amber-400" : "bg-red-400"}`} />
-                    <span className="text-xs font-semibold text-gray-700">{post.taux_engagement}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => openEdit(post)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors">
-                  <PencilIcon className="w-4 h-4" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
+        {/* Formulaire */}
+        <div className="space-y-5">
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-2">Sujet du post</label>
+            <textarea
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={3}
+              placeholder="Ex : L'importance du feedback managérial, ou : Comment j'ai aidé un DRH à retrouver confiance..."
+              value={sujet}
+              onChange={e => setSujet(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-2">Angle</label>
+            <div className="flex flex-wrap gap-2">
+              {(["Conseil pratique", "Storytelling", "Opinion", "Retour d'expérience", "Cas client"] as Angle[]).map(a => (
+                <button
+                  key={a}
+                  onClick={() => setAngle(a)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${angle === a ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                >
+                  {a}
                 </button>
-                <button onClick={() => remove(post.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors">
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
 
-      {modal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-6">{editing ? "Modifier le post" : "Nouveau post"}</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Date</label>
-                <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-2">Ton</label>
+            <div className="flex flex-wrap gap-2">
+              {(["Professionnel", "Direct et cash", "Inspirant"] as Ton[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTon(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${ton === t ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-2">Longueur</label>
+            <div className="flex flex-wrap gap-2">
+              {(["Court 150 mots", "Moyen 300 mots", "Long 500 mots"] as Longueur[]).map(l => (
+                <button
+                  key={l}
+                  onClick={() => setLongueur(l)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${longueur === l ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={generate}
+            disabled={loading || !sujet.trim()}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Génération en cours...
+              </>
+            ) : (
+              <>✨ Générer</>
+            )}
+          </button>
+        </div>
+
+        {/* Résultat */}
+        <div>
+          {output ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-500">Post généré</label>
+                <button
+                  onClick={() => navigator.clipboard.writeText(output)}
+                  className="text-xs text-indigo-600 hover:underline"
+                >
+                  📋 Copier
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Format</label>
-                <select className="input" value={form.format} onChange={e => setForm(f => ({ ...f, format: e.target.value as Format }))}>
-                  <option value="texte">Texte</option>
-                  <option value="carousel">Carousel</option>
-                  <option value="video">Vidéo</option>
-                  <option value="image">Image</option>
-                  <option value="article">Article</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-500 block mb-1">Contenu / Titre</label>
-                <textarea className="input resize-none" rows={3} value={form.contenu} onChange={e => setForm(f => ({ ...f, contenu: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Vues</label>
-                <input className="input" type="number" min={0} value={form.vues} onChange={e => setForm(f => ({ ...f, vues: Number(e.target.value) }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Likes</label>
-                <input className="input" type="number" min={0} value={form.likes} onChange={e => setForm(f => ({ ...f, likes: Number(e.target.value) }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Commentaires</label>
-                <input className="input" type="number" min={0} value={form.commentaires} onChange={e => setForm(f => ({ ...f, commentaires: Number(e.target.value) }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Partages</label>
-                <input className="input" type="number" min={0} value={form.partages} onChange={e => setForm(f => ({ ...f, partages: Number(e.target.value) }))} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-500 block mb-1">Tags (séparés par des virgules)</label>
-                <input className="input" value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="recrutement, RH, leadership" />
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 text-sm text-gray-700 whitespace-pre-wrap min-h-64 leading-relaxed">
+                {output}
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Annuler</button>
-              <button onClick={save} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">Enregistrer</button>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-center text-gray-400 bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-4xl mb-3">✍️</p>
+              <p className="font-medium">Votre post apparaîtra ici</p>
+              <p className="text-sm mt-1">Remplissez le formulaire et cliquez sur Générer</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal clé API */}
+      {showApiModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-semibold mb-2">Clé API Anthropic</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Entrez votre clé API Anthropic pour utiliser le générateur. Elle sera stockée uniquement dans votre navigateur (localStorage).
+            </p>
+            <input
+              className="input w-full mb-4"
+              type="password"
+              placeholder="sk-ant-..."
+              value={tempKey}
+              onChange={e => setTempKey(e.target.value)}
+            />
+            <p className="text-xs text-gray-400 mb-4">Obtenez votre clé sur console.anthropic.com</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowApiModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Annuler</button>
+              <button onClick={saveApiKey} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">Enregistrer</button>
             </div>
           </div>
         </div>

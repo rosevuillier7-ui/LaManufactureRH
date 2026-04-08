@@ -3,6 +3,7 @@
 export type ClientStatus = "prospect" | "actif" | "inactif";
 export type MissionStatus = "ouverte" | "en_cours" | "pourvue" | "annulée";
 export type CandidatStatus = "identifié" | "contacté" | "présenté" | "retenu" | "refusé";
+export type ProspectStatus = "À contacter" | "Contacté" | "En discussion" | "Proposition envoyée" | "Signé" | "Perdu";
 
 export interface Client {
   id: string;
@@ -41,7 +42,18 @@ export interface Candidat {
   statut: CandidatStatus;
   missionId?: string;
   dateAjout: string;
+  dernierContact?: string;
   notes: string;
+}
+
+export interface Prospect {
+  id: string;
+  entreprise: string;
+  nomContact: string;
+  posteContact: string;
+  statut: ProspectStatus;
+  dernierContact: string;
+  note: string;
 }
 
 export type CoachingStatut = "actif" | "terminé" | "pause";
@@ -108,6 +120,7 @@ export interface AppData {
   sessions: Session[];
   posts: PostLinkedIn[];
   episodes: Episode[];
+  prospects: Prospect[];
 }
 
 const STORAGE_KEY = "lamanufacturehr_data";
@@ -284,6 +297,35 @@ const defaultData: AppData = {
       tags: ["DRH", "stratégie"],
     },
   ],
+  prospects: [
+    {
+      id: "pr1",
+      entreprise: "Alpha Tech",
+      nomContact: "Julien Moreau",
+      posteContact: "DRH",
+      statut: "En discussion",
+      dernierContact: "2026-04-01",
+      note: "Intéressé par une mission de recrutement RRH",
+    },
+    {
+      id: "pr2",
+      entreprise: "Beta Services",
+      nomContact: "Camille Durand",
+      posteContact: "DG",
+      statut: "À contacter",
+      dernierContact: "2026-03-25",
+      note: "Référence de Marie Dupont",
+    },
+    {
+      id: "pr3",
+      entreprise: "Delta Conseil",
+      nomContact: "Romain Favre",
+      posteContact: "DAF",
+      statut: "Proposition envoyée",
+      dernierContact: "2026-04-05",
+      note: "Proposition coaching dirigeant envoyée",
+    },
+  ],
   episodes: [
     {
       id: "ep1",
@@ -338,7 +380,9 @@ export function loadData(): AppData {
       saveData(defaultData);
       return defaultData;
     }
-    return JSON.parse(raw) as AppData;
+    const parsed = JSON.parse(raw) as AppData;
+    if (!parsed.prospects) parsed.prospects = defaultData.prospects;
+    return parsed;
   } catch {
     return defaultData;
   }

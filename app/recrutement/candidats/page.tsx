@@ -20,6 +20,10 @@ const statusVariant: Record<CandidatStatus, "gray" | "yellow" | "blue" | "green"
   refusé: "red",
 };
 
+function daysSince(date: string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+}
+
 const emptyCandidat = (): Omit<Candidat, "id"> => ({
   nom: "",
   prenom: "",
@@ -30,6 +34,7 @@ const emptyCandidat = (): Omit<Candidat, "id"> => ({
   statut: "identifié",
   missionId: "",
   dateAjout: new Date().toISOString().split("T")[0],
+  dernierContact: new Date().toISOString().split("T")[0],
   notes: "",
 });
 
@@ -57,6 +62,17 @@ export default function CandidatsPage() {
     saveData(updated);
     setData(updated);
     setModal(false);
+  }
+
+  function relancer(id: string) {
+    if (!data) return;
+    const today = new Date().toISOString().split("T")[0];
+    const candidats = data.candidats.map(c =>
+      c.id === id ? { ...c, dernierContact: today, statut: "contacté" as CandidatStatus } : c
+    );
+    const updated = { ...data, candidats };
+    saveData(updated);
+    setData(updated);
   }
 
   function remove(id: string) {
@@ -98,8 +114,13 @@ export default function CandidatsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(candidat => {
           const mission = data.missions.find(m => m.id === candidat.missionId);
+          const contactDate = candidat.dernierContact || candidat.dateAjout;
+          const overdue = daysSince(contactDate) > 5;
           return (
-            <div key={candidat.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div
+              key={candidat.id}
+              className={`bg-white rounded-2xl border p-5 shadow-sm transition-colors ${overdue ? "border-orange-300" : "border-gray-100"}`}
+            >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">
@@ -125,13 +146,27 @@ export default function CandidatsPage() {
                 {candidat.linkedin && <p>🔗 {candidat.linkedin}</p>}
               </div>
 
+              <div className={`mt-3 text-xs flex items-center gap-1 ${overdue ? "text-orange-500 font-medium" : "text-gray-400"}`}>
+                <span>Dernier contact :</span>
+                <span>
+                  {new Date(contactDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                </span>
+                {overdue && <span>({daysSince(contactDate)}j)</span>}
+              </div>
+
               {candidat.notes && (
-                <p className="mt-3 text-xs text-gray-400 italic line-clamp-2">{candidat.notes}</p>
+                <p className="mt-2 text-xs text-gray-400 italic line-clamp-2">{candidat.notes}</p>
               )}
 
               <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
                 <button onClick={() => openEdit(candidat)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                   <PencilIcon className="w-3.5 h-3.5" /> Modifier
+                </button>
+                <button
+                  onClick={() => relancer(candidat.id)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  ↩ Relancer
                 </button>
                 <button onClick={() => remove(candidat.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-auto">
                   <TrashIcon className="w-3.5 h-3.5" /> Supprimer
@@ -176,6 +211,10 @@ export default function CandidatsPage() {
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">Téléphone</label>
                 <input className="input" value={form.telephone} onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Date dernier contact</label>
+                <input className="input" type="date" value={form.dernierContact || ""} onChange={e => setForm(f => ({ ...f, dernierContact: e.target.value }))} />
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-medium text-gray-500 block mb-1">LinkedIn</label>
