@@ -56,6 +56,17 @@ export interface Prospect {
   note: string;
 }
 
+export type ActionType = "contact" | "relance" | "statut" | "note" | "Appel" | "Email" | "RDV" | "Note";
+
+export interface ProspectAction {
+  id: string;
+  prospectId: string;
+  date: string;
+  type: ActionType;
+  description: string;
+  auteur: string;
+}
+
 export type CoachingStatut = "actif" | "terminé" | "pause";
 
 export interface Coachee {

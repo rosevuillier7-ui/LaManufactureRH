@@ -11,7 +11,9 @@
       "Bash(git commit:*)",
       "Bash(curl -s http://localhost:3000)",
       "Bash(mkdir -p /tmp/design-audit-20260408)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(git push:*)"
     ]
   }
 }

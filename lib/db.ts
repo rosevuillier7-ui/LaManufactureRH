@@ -3,7 +3,7 @@
 
 import { supabase } from "./supabase";
 import type {
-  Prospect, ProspectStatus,
+  Prospect, ProspectStatus, ProspectAction, ActionType,
   Client, ClientStatus,
   Mission, MissionStatus,
   Candidat, CandidatStatus,
@@ -75,6 +75,40 @@ export async function updateProspect(id: string, p: Prospect): Promise<void> {
 
 export async function removeProspect(id: string): Promise<void> {
   const { error } = await supabase.from("prospects").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromDbAction(row: any): ProspectAction {
+  return {
+    id: str(row.id),
+    prospectId: str(row.prospect_id),
+    date: str(row.date),
+    type: str(row.type) as ActionType,
+    description: str(row.description),
+    auteur: str(row.auteur),
+  };
+}
+
+export async function getActionsForProspect(prospectId: string): Promise<ProspectAction[]> {
+  const { data, error } = await supabase
+    .from("prospect_actions")
+    .select("*")
+    .eq("prospect_id", prospectId)
+    .order("date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbAction);
+}
+
+export async function createProspectAction(a: ProspectAction): Promise<void> {
+  const { error } = await supabase.from("prospect_actions").insert({
+    id: a.id,
+    prospect_id: a.prospectId,
+    date: a.date,
+    type: a.type,
+    description: a.description,
+    auteur: a.auteur,
+  });
   if (error) throw error;
 }
 
