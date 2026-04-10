@@ -1,12 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllEpisodes, createEpisode, updateEpisode, removeEpisode } from "@/lib/db";
 import { Episode, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import StatCard from "@/components/StatCard";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+
+type YouTubeStats = {
+  connected: boolean;
+  totalViews?: number;
+  subscribers?: number | null;
+  avgWatchDuration?: number | null;
+  videos?: { id: string; title: string; views: number }[];
+};
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
 
 type EpStatut = Episode["statut"];
 
@@ -41,6 +56,11 @@ export default function PodcastPage() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Episode | null>(null);
   const [form, setForm] = useState(emptyEpisode(1));
+  const [ytStats, setYtStats] = useState<YouTubeStats | null>(null);
+  const [ytLoading, setYtLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const ytConnected = searchParams.get("yt_connected") === "1";
+  const ytError = searchParams.get("yt_error") === "1";
 
   async function load() {
     const data = await getAllEpisodes();
@@ -57,6 +77,13 @@ export default function PodcastPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/youtube-stats")
+      .then((r) => r.json())
+      .then((data) => { setYtStats(data); setYtLoading(false); })
+      .catch(() => { setYtStats({ connected: false }); setYtLoading(false); });
   }, []);
 
   function openAdd() {
@@ -107,6 +134,114 @@ export default function PodcastPage() {
         <StatCard label="Total écoutes" value={totalEcoutes.toLocaleString("fr-FR")} color="amber" />
         <StatCard label="Moy. écoutes / épisode" value={avgEcoutes.toLocaleString("fr-FR")} color="sky" />
         <StatCard label="En préparation" value={episodes.filter(e => e.statut !== "publié").length} color="gray" />
+      </div>
+
+      {/* YouTube Analytics */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <svg className="w-5 h-5 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          <h2 className="font-semibold text-gray-900">YouTube Analytics</h2>
+        </div>
+
+        {ytConnected && (
+          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+            Compte YouTube connecté avec succès.
+          </div>
+        )}
+        {ytError && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            Erreur lors de la connexion YouTube. Réessaie.
+          </div>
+        )}
+
+        {ytLoading ? (
+          <div className="h-24 bg-gray-100 rounded-2xl animate-pulse" />
+        ) : !ytStats?.connected ? (
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <svg className="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Connecte ton compte YouTube</p>
+              <p className="text-xs text-gray-500 mt-1">Pour afficher les vues, abonnés et durée de visionnage</p>
+            </div>
+            <a
+              href="/api/youtube/auth/login"
+              className="mt-1 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Connecter YouTube
+            </a>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                label="Vues totales"
+                value={(ytStats.totalViews ?? 0).toLocaleString("fr-FR")}
+                color="rose"
+              />
+              <StatCard
+                label="Abonnés"
+                value={
+                  ytStats.subscribers == null
+                    ? "—"
+                    : ytStats.subscribers.toLocaleString("fr-FR")
+                }
+                color="amber"
+              />
+              <StatCard
+                label="Durée moy. visionnage"
+                value={
+                  ytStats.avgWatchDuration != null
+                    ? formatDuration(ytStats.avgWatchDuration)
+                    : "—"
+                }
+                color="sky"
+              />
+              <StatCard
+                label="Vues moy. / vidéo"
+                value={
+                  ytStats.videos && ytStats.videos.length > 0
+                    ? Math.round(
+                        ytStats.videos.reduce((s, v) => s + v.views, 0) /
+                          ytStats.videos.length
+                      ).toLocaleString("fr-FR")
+                    : "—"
+                }
+                color="indigo"
+              />
+            </div>
+
+            {ytStats.videos && ytStats.videos.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="text-left px-5 py-3 font-medium">Vidéo</th>
+                      <th className="text-right px-5 py-3 font-medium">Vues</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ytStats.videos
+                      .sort((a, b) => b.views - a.views)
+                      .map((v) => (
+                        <tr key={v.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                          <td className="px-5 py-3 text-gray-700 truncate max-w-xs">{v.title}</td>
+                          <td className="px-5 py-3 text-right font-semibold text-gray-900">
+                            {v.views.toLocaleString("fr-FR")}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-4">

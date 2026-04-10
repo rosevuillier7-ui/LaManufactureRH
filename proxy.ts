@@ -12,8 +12,12 @@ function getExpectedToken() {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow login page and auth API
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  // Allow login page and auth APIs
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/youtube/auth")
+  ) {
     return NextResponse.next();
   }
 
