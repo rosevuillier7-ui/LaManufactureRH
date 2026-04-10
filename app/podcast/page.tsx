@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getAllEpisodes, createEpisode, updateEpisode, removeEpisode } from "@/lib/db";
@@ -50,6 +50,26 @@ const emptyEpisode = (nb: number): Omit<Episode, "id"> => ({
   statut: "brouillon",
 });
 
+function YouTubeNotifications() {
+  const searchParams = useSearchParams();
+  const ytConnected = searchParams.get("yt_connected") === "1";
+  const ytError = searchParams.get("yt_error") === "1";
+  return (
+    <>
+      {ytConnected && (
+        <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+          Compte YouTube connecté avec succès.
+        </div>
+      )}
+      {ytError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          Erreur lors de la connexion YouTube. Réessaie.
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function PodcastPage() {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +78,6 @@ export default function PodcastPage() {
   const [form, setForm] = useState(emptyEpisode(1));
   const [ytStats, setYtStats] = useState<YouTubeStats | null>(null);
   const [ytLoading, setYtLoading] = useState(true);
-  const searchParams = useSearchParams();
-  const ytConnected = searchParams.get("yt_connected") === "1";
-  const ytError = searchParams.get("yt_error") === "1";
 
   async function load() {
     const data = await getAllEpisodes();
@@ -145,16 +162,9 @@ export default function PodcastPage() {
           <h2 className="font-semibold text-gray-900">YouTube Analytics</h2>
         </div>
 
-        {ytConnected && (
-          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-            Compte YouTube connecté avec succès.
-          </div>
-        )}
-        {ytError && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            Erreur lors de la connexion YouTube. Réessaie.
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <YouTubeNotifications />
+        </Suspense>
 
         {ytLoading ? (
           <div className="h-24 bg-gray-100 rounded-2xl animate-pulse" />
