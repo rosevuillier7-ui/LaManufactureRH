@@ -91,6 +91,10 @@ export interface Coachee {
   seancesFaites: number;
   dateDebut: string;
   notes: string;
+  linkedin: string;
+  typeCoaching: string;
+  tarifSeance: string;
+  prochainRdv?: string;
 }
 
 export interface Session {
@@ -101,6 +105,12 @@ export interface Session {
   resume: string;
   pointsCles: string;
   prochainRdv?: string;
+  numeroSeance: number;
+  objectifSeance: string;
+  bienMarche: string;
+  ceQuiBloque: string;
+  actionSuivante: string;
+  niveauEnergie: number; // 1-5, 0 = non défini
 }
 
 export interface PostLinkedIn {

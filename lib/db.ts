@@ -311,6 +311,10 @@ function fromDbCoachee(row: any): Coachee {
     seancesFaites: num(row.seances_faites),
     dateDebut: str(row.date_debut),
     notes: str(row.notes),
+    linkedin: str(row.linkedin),
+    typeCoaching: str(row.type_coaching),
+    tarifSeance: str(row.tarif_seance),
+    prochainRdv: nullable(row.prochain_rdv),
   };
 }
 
@@ -329,6 +333,10 @@ function toDbCoachee(c: Coachee) {
     seances_faites: c.seancesFaites,
     date_debut: c.dateDebut,
     notes: c.notes,
+    linkedin: c.linkedin,
+    type_coaching: c.typeCoaching,
+    tarif_seance: c.tarifSeance,
+    prochain_rdv: toNullable(c.prochainRdv),
   };
 }
 
@@ -366,6 +374,12 @@ function fromDbSession(row: any): Session {
     resume: str(row.resume),
     pointsCles: str(row.points_cles),
     prochainRdv: nullable(row.prochain_rdv),
+    numeroSeance: num(row.numero_seance),
+    objectifSeance: str(row.objectif_seance),
+    bienMarche: str(row.bien_marche),
+    ceQuiBloque: str(row.ce_qui_bloque),
+    actionSuivante: str(row.action_suivante),
+    niveauEnergie: num(row.niveau_energie),
   };
 }
 
@@ -378,6 +392,12 @@ function toDbSession(s: Session) {
     resume: s.resume,
     points_cles: s.pointsCles,
     prochain_rdv: toNullable(s.prochainRdv),
+    numero_seance: s.numeroSeance,
+    objectif_seance: s.objectifSeance,
+    bien_marche: s.bienMarche,
+    ce_qui_bloque: s.ceQuiBloque,
+    action_suivante: s.actionSuivante,
+    niveau_energie: s.niveauEnergie,
   };
 }
 
