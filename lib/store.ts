@@ -46,6 +46,8 @@ export interface Candidat {
   notes: string;
 }
 
+export type TypeService = "Recrutement" | "Coaching" | "Les deux";
+
 export interface Prospect {
   id: string;
   entreprise: string;
@@ -54,6 +56,12 @@ export interface Prospect {
   statut: ProspectStatus;
   dernierContact: string;
   note: string;
+  telephone?: string;
+  email?: string;
+  linkedin?: string;
+  typeService?: TypeService;
+  valeurEstimee?: string;
+  prochainRdv?: string;
 }
 
 export type ActionType = "contact" | "relance" | "statut" | "note" | "Appel" | "Email" | "RDV" | "Note";

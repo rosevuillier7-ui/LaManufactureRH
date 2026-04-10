@@ -10,7 +10,7 @@ import {
   getActionsForProspect,
   createProspectAction,
 } from "@/lib/db";
-import { Prospect, ProspectAction, ProspectStatus, ActionType, generateId } from "@/lib/store";
+import { Prospect, ProspectAction, ProspectStatus, ActionType, TypeService, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import {
   PlusIcon,
@@ -24,6 +24,7 @@ import {
   PencilSquareIcon,
   ArrowsRightLeftIcon,
   ChatBubbleLeftIcon,
+  LinkIcon,
 } from "@heroicons/react/24/outline";
 
 const statusOptions: ProspectStatus[] = [
@@ -36,6 +37,14 @@ const statusOptions: ProspectStatus[] = [
 ];
 
 const manualActionTypes: ActionType[] = ["Appel", "Email", "RDV", "Note"];
+
+const typeServiceVariant: Record<TypeService, "indigo" | "purple" | "blue"> = {
+  "Recrutement": "indigo",
+  "Coaching": "purple",
+  "Les deux": "blue",
+};
+
+const typeServiceOptions: TypeService[] = ["Recrutement", "Coaching", "Les deux"];
 
 const statusVariant: Record<ProspectStatus, "gray" | "yellow" | "blue" | "indigo" | "green" | "red"> = {
   "À contacter": "gray",
@@ -57,6 +66,12 @@ const emptyProspect = (): Omit<Prospect, "id"> => ({
   statut: "À contacter",
   dernierContact: new Date().toISOString().split("T")[0],
   note: "",
+  telephone: "",
+  email: "",
+  linkedin: "",
+  typeService: undefined,
+  valeurEstimee: "",
+  prochainRdv: "",
 });
 
 function ActionIcon({ type }: { type: ActionType }) {
@@ -191,7 +206,7 @@ export default function ProspectsPage() {
       prospectId: p.id,
       date: new Date().toISOString(),
       type: "relance",
-      description: "Relance effectuée",
+      description: "Relance envoyée",
       auteur: "",
     });
     await load();
@@ -369,7 +384,7 @@ export default function ProspectsPage() {
         <div className="w-[400px] flex-shrink-0 border-l border-gray-100 bg-white overflow-y-auto flex flex-col">
           {/* Header */}
           <div className="px-6 py-5 border-b border-gray-100">
-            <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-start justify-between gap-3 mb-2">
               <h2 className="text-lg font-bold text-gray-900 leading-tight">{selectedProspect.entreprise}</h2>
               <button
                 onClick={closePanel}
@@ -378,21 +393,83 @@ export default function ProspectsPage() {
                 <XMarkIcon className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-gray-600 mb-2">
               {selectedProspect.nomContact}
               {selectedProspect.posteContact && (
                 <span className="text-gray-400"> · {selectedProspect.posteContact}</span>
               )}
             </p>
-            <div className="flex items-center gap-3 flex-wrap">
+
+            {/* Prochain RDV — prominent, at top */}
+            {selectedProspect.prochainRdv && (
+              <div className={`flex items-center gap-1.5 text-xs font-semibold mb-3 ${
+                new Date(selectedProspect.prochainRdv) < new Date()
+                  ? "text-red-500"
+                  : "text-indigo-600"
+              }`}>
+                <CalendarIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                Prochain RDV :{" "}
+                {new Date(selectedProspect.prochainRdv).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                {new Date(selectedProspect.prochainRdv) < new Date() && (
+                  <span className="font-normal ml-0.5">(passé)</span>
+                )}
+              </div>
+            )}
+
+            {/* Statut + type service + valeur estimée */}
+            <div className="flex items-center gap-2 flex-wrap mb-3">
               <Badge label={selectedProspect.statut} variant={statusVariant[selectedProspect.statut]} />
-              <span className="text-xs text-gray-400">
-                Dernier contact :{" "}
-                <span className="text-gray-600">
-                  {new Date(selectedProspect.dernierContact).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-                </span>
-              </span>
+              {selectedProspect.typeService && (
+                <Badge label={selectedProspect.typeService} variant={typeServiceVariant[selectedProspect.typeService]} />
+              )}
+              {selectedProspect.valeurEstimee && (
+                <Badge label={selectedProspect.valeurEstimee} variant="green" />
+              )}
             </div>
+
+            {/* Contact links */}
+            {(selectedProspect.telephone || selectedProspect.email || selectedProspect.linkedin) && (
+              <div className="flex flex-col gap-1.5 mb-3">
+                {selectedProspect.telephone && (
+                  <a
+                    href={`tel:${selectedProspect.telephone}`}
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {selectedProspect.telephone}
+                  </a>
+                )}
+                {selectedProspect.email && (
+                  <a
+                    href={`mailto:${selectedProspect.email}`}
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    <EnvelopeIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {selectedProspect.email}
+                  </a>
+                )}
+                {selectedProspect.linkedin && (
+                  <a
+                    href={selectedProspect.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    LinkedIn
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Dernier contact */}
+            <p className="text-xs text-gray-400">
+              Dernier contact :{" "}
+              <span className="text-gray-600">
+                {new Date(selectedProspect.dernierContact).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+              </span>
+            </p>
+
             {selectedProspect.note && (
               <p className="mt-3 text-xs text-gray-400 italic leading-relaxed">{selectedProspect.note}</p>
             )}
@@ -496,10 +573,13 @@ export default function ProspectsPage() {
       {/* Edit/Add modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-semibold mb-6">
-              {editing ? "Modifier le prospect" : "Nouveau prospect"}
-            </h2>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold">
+                {editing ? "Modifier le prospect" : "Nouveau prospect"}
+              </h2>
+            </div>
+            <div className="overflow-y-auto px-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-xs font-medium text-gray-500 block mb-1">Entreprise</label>
@@ -526,6 +606,58 @@ export default function ProspectsPage() {
                 />
               </div>
               <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Téléphone</label>
+                <input
+                  className="input"
+                  type="tel"
+                  placeholder="+33 6 00 00 00 00"
+                  value={form.telephone ?? ""}
+                  onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Email</label>
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="contact@entreprise.com"
+                  value={form.email ?? ""}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-500 block mb-1">LinkedIn URL</label>
+                <input
+                  className="input"
+                  type="url"
+                  placeholder="https://linkedin.com/in/..."
+                  value={form.linkedin ?? ""}
+                  onChange={e => setForm(f => ({ ...f, linkedin: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Type de service</label>
+                <select
+                  className="input"
+                  value={form.typeService ?? ""}
+                  onChange={e => setForm(f => ({ ...f, typeService: (e.target.value || undefined) as TypeService | undefined }))}
+                >
+                  <option value="">— Sélectionner —</option>
+                  {typeServiceOptions.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Valeur estimée</label>
+                <input
+                  className="input"
+                  placeholder="5 000€"
+                  value={form.valeurEstimee ?? ""}
+                  onChange={e => setForm(f => ({ ...f, valeurEstimee: e.target.value }))}
+                />
+              </div>
+              <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">Statut</label>
                 <select
                   className="input"
@@ -536,6 +668,15 @@ export default function ProspectsPage() {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Prochain RDV</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.prochainRdv ?? ""}
+                  onChange={e => setForm(f => ({ ...f, prochainRdv: e.target.value }))}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">Date dernier contact</label>
@@ -556,7 +697,8 @@ export default function ProspectsPage() {
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
               <button
                 onClick={() => setModal(false)}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"

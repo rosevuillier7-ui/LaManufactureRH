@@ -3,7 +3,7 @@
 
 import { supabase } from "./supabase";
 import type {
-  Prospect, ProspectStatus, ProspectAction, ActionType,
+  Prospect, ProspectStatus, ProspectAction, ActionType, TypeService,
   Client, ClientStatus,
   Mission, MissionStatus,
   Candidat, CandidatStatus,
@@ -41,6 +41,12 @@ function fromDbProspect(row: any): Prospect {
     statut: str(row.statut) as ProspectStatus,
     dernierContact: str(row.dernier_contact),
     note: str(row.note),
+    telephone: nullable(row.telephone),
+    email: nullable(row.email),
+    linkedin: nullable(row.linkedin),
+    typeService: nullable(row.type_service) as TypeService | undefined,
+    valeurEstimee: nullable(row.valeur_estimee),
+    prochainRdv: nullable(row.prochain_rdv),
   };
 }
 
@@ -53,6 +59,12 @@ function toDbProspect(p: Prospect) {
     statut: p.statut,
     dernier_contact: p.dernierContact,
     note: p.note,
+    telephone: toNullable(p.telephone),
+    email: toNullable(p.email),
+    linkedin: toNullable(p.linkedin),
+    type_service: toNullable(p.typeService),
+    valeur_estimee: toNullable(p.valeurEstimee),
+    prochain_rdv: toNullable(p.prochainRdv),
   };
 }
 
