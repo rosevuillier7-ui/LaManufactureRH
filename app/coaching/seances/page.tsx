@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { getAllSessions, createSession, updateSession, removeSession, getAllCoachees } from "@/lib/db";
 import { Session, Coachee, generateId } from "@/lib/store";
 import { PlusIcon, PencilIcon, TrashIcon, ClipboardDocumentIcon, CheckIcon } from "@heroicons/react/24/outline";
+import CoacheeDebriefSection from "./CoacheeDebriefSection";
 
 const dureeOptions = [30, 45, 60, 90, 120];
 
@@ -225,6 +226,10 @@ export default function SeancesPage() {
                   {coachee ? `${coachee.prenom} ${coachee.nom}` : "Coaché inconnu"}
                 </h2>
                 <span className="text-xs text-gray-400">{groupSessions.length} séance{groupSessions.length > 1 ? "s" : ""}</span>
+              </div>
+
+              <div className="pl-11">
+                <CoacheeDebriefSection coacheeId={coacheeId} />
               </div>
 
               <div className="space-y-3 pl-11">

@@ -141,6 +141,18 @@ export interface Episode {
   statut: "brouillon" | "enregistré" | "publié";
 }
 
+export interface CoachingObjective {
+  id: string;
+  coacheeId: string;
+  objectifPrincipal: string;
+  indicateursReussite: string;
+}
+
+export interface DebriefTheme {
+  titre: string;
+  description: string;
+}
+
 export interface AppData {
   clients: Client[];
   missions: Mission[];

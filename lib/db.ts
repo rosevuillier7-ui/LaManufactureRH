@@ -11,6 +11,7 @@ import type {
   Session,
   PostLinkedIn,
   Episode,
+  CoachingObjective,
 } from "./store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -534,5 +535,40 @@ export async function updateEpisode(id: string, e: Episode): Promise<void> {
 
 export async function removeEpisode(id: string): Promise<void> {
   const { error } = await supabase.from("podcast_episodes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Coaching Objectives ──────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromDbObjective(row: any): CoachingObjective {
+  return {
+    id: str(row.id),
+    coacheeId: str(row.coachee_id),
+    objectifPrincipal: str(row.objectif_principal),
+    indicateursReussite: str(row.indicateurs_reussite),
+  };
+}
+
+export async function getObjectiveByCoachee(coacheeId: string): Promise<CoachingObjective | null> {
+  const { data, error } = await supabase
+    .from("coaching_objectives")
+    .select("*")
+    .eq("coachee_id", coacheeId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? fromDbObjective(data) : null;
+}
+
+export async function upsertObjective(obj: CoachingObjective): Promise<void> {
+  const { error } = await supabase.from("coaching_objectives").upsert(
+    {
+      id: obj.id,
+      coachee_id: obj.coacheeId,
+      objectif_principal: obj.objectifPrincipal,
+      indicateurs_reussite: obj.indicateursReussite,
+    },
+    { onConflict: "coachee_id" }
+  );
   if (error) throw error;
 }

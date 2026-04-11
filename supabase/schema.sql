@@ -80,6 +80,13 @@ create table if not exists sessions (
   prochain_rdv date
 );
 
+create table if not exists coaching_objectives (
+  id text primary key,
+  coachee_id text not null unique references coachees(id) on delete cascade,
+  objectif_principal text not null default '',
+  indicateurs_reussite text not null default ''
+);
+
 create table if not exists linkedin_posts (
   id text primary key,
   date date not null default current_date,
