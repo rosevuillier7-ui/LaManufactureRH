@@ -12,6 +12,7 @@ import type {
   PostLinkedIn,
   Episode,
   CoachingObjective,
+  Placement,
 } from "./store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -570,5 +571,85 @@ export async function upsertObjective(obj: CoachingObjective): Promise<void> {
     },
     { onConflict: "coachee_id" }
   );
+  if (error) throw error;
+}
+
+// ─── Placements ───────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromDbPlacement(row: any): Placement {
+  return {
+    id: str(row.id),
+    recruiteeId: str(row.recruitee_id),
+    nom: str(row.nom),
+    prenom: str(row.prenom),
+    poste: str(row.poste),
+    entreprise: str(row.entreprise),
+    datePriseDePoste: nullable(row.date_prise_de_poste),
+    calEventJMinus1Id: nullable(row.cal_event_j_minus_1_id),
+    calEventJId: nullable(row.cal_event_j_id),
+    calEventJPlus15Id: nullable(row.cal_event_j_plus_15_id),
+    calEventJPlus46Id: nullable(row.cal_event_j_plus_46_id),
+    calEventJPlus76Id: nullable(row.cal_event_j_plus_76_id),
+    createdAt: str(row.created_at),
+  };
+}
+
+export async function getAllPlacements(): Promise<Placement[]> {
+  const { data, error } = await supabase
+    .from("placements")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbPlacement);
+}
+
+export async function upsertPlacement(p: {
+  recruiteeId: string;
+  nom: string;
+  prenom: string;
+  poste: string;
+  entreprise: string;
+}): Promise<Placement> {
+  const { data, error } = await supabase
+    .from("placements")
+    .upsert(
+      {
+        recruitee_id: p.recruiteeId,
+        nom: p.nom,
+        prenom: p.prenom,
+        poste: p.poste,
+        entreprise: p.entreprise,
+      },
+      { onConflict: "recruitee_id" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDbPlacement(data);
+}
+
+export async function updatePlacementStartDate(
+  id: string,
+  datePriseDePoste: string,
+  eventIds: {
+    calEventJMinus1Id: string;
+    calEventJId: string;
+    calEventJPlus15Id: string;
+    calEventJPlus46Id: string;
+    calEventJPlus76Id: string;
+  }
+): Promise<void> {
+  const { error } = await supabase
+    .from("placements")
+    .update({
+      date_prise_de_poste: datePriseDePoste,
+      cal_event_j_minus_1_id: eventIds.calEventJMinus1Id,
+      cal_event_j_id: eventIds.calEventJId,
+      cal_event_j_plus_15_id: eventIds.calEventJPlus15Id,
+      cal_event_j_plus_46_id: eventIds.calEventJPlus46Id,
+      cal_event_j_plus_76_id: eventIds.calEventJPlus76Id,
+    })
+    .eq("id", id);
   if (error) throw error;
 }

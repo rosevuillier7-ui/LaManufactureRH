@@ -148,6 +148,22 @@ export interface CoachingObjective {
   indicateursReussite: string;
 }
 
+export interface Placement {
+  id: string;
+  recruiteeId: string;
+  nom: string;
+  prenom: string;
+  poste: string;
+  entreprise: string;
+  datePriseDePoste?: string; // YYYY-MM-DD
+  calEventJMinus1Id?: string;
+  calEventJId?: string;
+  calEventJPlus15Id?: string;
+  calEventJPlus46Id?: string;
+  calEventJPlus76Id?: string;
+  createdAt: string;
+}
+
 export interface DebriefTheme {
   titre: string;
   description: string;
