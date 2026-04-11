@@ -27,6 +27,7 @@ const nav = [
       { label: "Clients", href: "/recrutement/clients" },
       { label: "Missions", href: "/recrutement/missions" },
       { label: "Candidats", href: "/recrutement/candidats" },
+      { label: "Suivi post-placement", href: "/recrutement/suivi" },
     ],
   },
   {
