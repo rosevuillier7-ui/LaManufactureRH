@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getObjectiveByCoachee, upsertObjective } from "@/lib/db";
 import { CoachingObjective, DebriefTheme, generateId } from "@/lib/store";
-import { CloudArrowUpIcon, SparklesIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { SparklesIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   coacheeId: string;
@@ -15,7 +15,7 @@ export default function CoacheeDebriefSection({ coacheeId }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [debriefText, setDebriefText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [themes, setThemes] = useState<DebriefTheme[]>([]);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -48,17 +48,20 @@ export default function CoacheeDebriefSection({ coacheeId }: Props) {
   }
 
   async function analyzeDebrief() {
-    if (!audioFile) return;
+    if (!debriefText.trim()) return;
     setAnalyzing(true);
     setAnalysisError(null);
     setThemes([]);
     try {
-      const fd = new FormData();
-      fd.append("audio", audioFile);
-      fd.append("objectifPrincipal", objective?.objectifPrincipal ?? form.objectifPrincipal);
-      fd.append("indicateursReussite", objective?.indicateursReussite ?? form.indicateursReussite);
-
-      const res = await fetch("/api/coaching/debrief", { method: "POST", body: fd });
+      const res = await fetch("/api/coaching/debrief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          debriefText,
+          objectifPrincipal: objective?.objectifPrincipal ?? form.objectifPrincipal,
+          indicateursReussite: objective?.indicateursReussite ?? form.indicateursReussite,
+        }),
+      });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? "Erreur lors de l'analyse");
       setThemes(data.themes ?? []);
@@ -115,27 +118,21 @@ export default function CoacheeDebriefSection({ coacheeId }: Props) {
           Débrief séance
         </h3>
 
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <label className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
-            <CloudArrowUpIcon className="w-4 h-4 flex-shrink-0 text-emerald-500" />
-            <span className="truncate max-w-[200px]">
-              {audioFile ? audioFile.name : "Importer un audio"}
-            </span>
-            <input
-              type="file"
-              accept=".mp3,.m4a,.wav,audio/mpeg,audio/mp4,audio/wav"
-              className="hidden"
-              onChange={(e) => {
-                setAudioFile(e.target.files?.[0] ?? null);
-                setThemes([]);
-                setAnalysisError(null);
-              }}
-            />
-          </label>
-
+        <div className="space-y-3 mb-3">
+          <textarea
+            className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 placeholder:text-gray-300"
+            rows={5}
+            value={debriefText}
+            onChange={(e) => {
+              setDebriefText(e.target.value);
+              setThemes([]);
+              setAnalysisError(null);
+            }}
+            placeholder="Notes de débrief de la séance..."
+          />
           <button
             onClick={analyzeDebrief}
-            disabled={!audioFile || analyzing}
+            disabled={!debriefText.trim() || analyzing}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <SparklesIcon className="w-4 h-4" />
