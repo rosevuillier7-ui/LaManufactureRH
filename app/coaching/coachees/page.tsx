@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { getAllCoachees, createCoachee, updateCoachee, removeCoachee, getAllSessions } from "@/lib/db";
 import { Coachee, CoachingStatut, Session, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
+import Link from "next/link";
 import { PlusIcon, PencilIcon, TrashIcon, PhoneIcon, EnvelopeIcon, LinkIcon, CalendarIcon } from "@heroicons/react/24/outline";
 
 const statusLabel: Record<CoachingStatut, string> = {
@@ -111,7 +112,8 @@ export default function CoacheesPage() {
           const rdvPast = coachee.prochainRdv && coachee.prochainRdv < today;
 
           return (
-            <div key={coachee.id} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <div key={coachee.id} className="relative bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all">
+              <Link href={`/coaching/coachees/${coachee.id}`} className="absolute inset-0 rounded-2xl" aria-label={`Voir ${coachee.prenom} ${coachee.nom}`} />
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
@@ -158,7 +160,7 @@ export default function CoacheesPage() {
               </div>
 
               {/* Contact links */}
-              <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-500">
+              <div className="relative z-10 flex flex-wrap gap-3 mb-3 text-xs text-gray-500">
                 {coachee.telephone && (
                   <a href={`tel:${coachee.telephone}`} className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
                     <PhoneIcon className="w-3.5 h-3.5" />{coachee.telephone}
@@ -191,11 +193,11 @@ export default function CoacheesPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-3 border-t border-gray-50">
-                <button onClick={() => openEdit(coachee)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <div className="relative z-10 flex gap-2 pt-3 border-t border-gray-50">
+                <button onClick={(e) => { e.preventDefault(); openEdit(coachee); }} className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                   <PencilIcon className="w-3.5 h-3.5" /> Modifier
                 </button>
-                <button onClick={() => remove(coachee.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-auto">
+                <button onClick={(e) => { e.preventDefault(); remove(coachee.id); }} className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-auto">
                   <TrashIcon className="w-3.5 h-3.5" />
                 </button>
               </div>

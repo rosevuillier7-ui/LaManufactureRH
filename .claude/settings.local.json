@@ -13,7 +13,8 @@
       "Bash(mkdir -p /tmp/design-audit-20260408)",
       "Bash(find:*)",
       "Bash(node:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")"
     ]
   }
 }

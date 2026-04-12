@@ -111,6 +111,8 @@ export interface Session {
   ceQuiBloque: string;
   actionSuivante: string;
   niveauEnergie: number; // 1-5, 0 = non défini
+  debriefText?: string;
+  themesResult?: DebriefTheme[];
 }
 
 export interface PostLinkedIn {

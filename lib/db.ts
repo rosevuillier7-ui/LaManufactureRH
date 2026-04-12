@@ -13,6 +13,7 @@ import type {
   Episode,
   CoachingObjective,
   Placement,
+  DebriefTheme,
 } from "./store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -342,6 +343,12 @@ function toDbCoachee(c: Coachee) {
   };
 }
 
+export async function getCoacheeById(id: string): Promise<Coachee | null> {
+  const { data, error } = await supabase.from("coachees").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? fromDbCoachee(data) : null;
+}
+
 export async function getAllCoachees(): Promise<Coachee[]> {
   const { data, error } = await supabase.from("coachees").select("*").order("date_debut", { ascending: false });
   if (error) throw error;
@@ -382,6 +389,8 @@ function fromDbSession(row: any): Session {
     ceQuiBloque: str(row.ce_qui_bloque),
     actionSuivante: str(row.action_suivante),
     niveauEnergie: num(row.niveau_energie),
+    debriefText: nullable(row.debrief_text),
+    themesResult: row.themes_result ?? undefined,
   };
 }
 
@@ -400,6 +409,8 @@ function toDbSession(s: Session) {
     ce_qui_bloque: s.ceQuiBloque,
     action_suivante: s.actionSuivante,
     niveau_energie: s.niveauEnergie,
+    debrief_text: s.debriefText ?? null,
+    themes_result: s.themesResult ?? null,
   };
 }
 
@@ -407,6 +418,28 @@ export async function getAllSessions(): Promise<Session[]> {
   const { data, error } = await supabase.from("sessions").select("*").order("date", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(fromDbSession);
+}
+
+export async function getSessionsByCoachee(coacheeId: string): Promise<Session[]> {
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("coachee_id", coacheeId)
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(fromDbSession);
+}
+
+export async function saveSessionDebrief(
+  sessionId: string,
+  debriefText: string,
+  themesResult: DebriefTheme[]
+): Promise<void> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ debrief_text: debriefText, themes_result: themesResult })
+    .eq("id", sessionId);
+  if (error) throw error;
 }
 
 export async function createSession(s: Session): Promise<Session> {
