@@ -151,14 +151,43 @@ export default function CoacheeDebriefSection({ coacheeId }: Props) {
             <p className="text-xs font-medium text-gray-500 mb-2">3 thèmes à travailler en prochaine séance</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {themes.map((theme, i) => (
-                <div key={i} className="bg-white rounded-xl border border-emerald-100 p-3.5 shadow-sm">
-                  <div className="flex items-start gap-2 mb-1.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <p className="text-xs font-semibold text-gray-900 leading-snug">{theme.titre}</p>
+                <div key={i} className="bg-white rounded-xl border border-emerald-100 p-3.5 shadow-sm flex flex-col gap-3">
+                  <div>
+                    <div className="flex items-start gap-2 mb-1.5">
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-900 leading-snug">{theme.titre}</p>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed pl-7">{theme.description}</p>
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed pl-7">{theme.description}</p>
+
+                  {theme.actions?.length > 0 && (
+                    <div className="pl-1">
+                      <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Actions</p>
+                      <ul className="space-y-1">
+                        {theme.actions.map((action, j) => (
+                          <li key={j} className="flex items-start gap-1.5 text-xs text-gray-600">
+                            <span className="mt-1 w-1 h-1 rounded-full bg-emerald-400 flex-shrink-0" />
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {theme.outils?.length > 0 && (
+                    <div className="pl-1">
+                      <p className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide mb-1.5">Outils & méthodes</p>
+                      <div className="flex flex-wrap gap-1">
+                        {theme.outils.map((outil, j) => (
+                          <span key={j} className="inline-block px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] text-indigo-700 font-medium">
+                            {outil}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

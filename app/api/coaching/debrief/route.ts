@@ -30,8 +30,14 @@ ${debriefText}
 
 À partir de ce débrief${objectivesContext ? " et des objectifs de la mission" : ""}, identifie les 3 thèmes prioritaires à travailler lors de la prochaine séance de coaching. Chaque thème doit être concret, actionnable et directement lié au débrief.
 
+Pour chaque thème, génère :
+- Un titre court et percutant
+- Une courte description (ce sur quoi travailler et pourquoi c'est prioritaire)
+- 2 à 3 actions concrètes à mettre en œuvre avant la prochaine séance
+- 1 à 2 outils ou méthodes spécifiques à utiliser (frameworks, exercices, templates, techniques)
+
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown ni texte autour :
-[{"titre": "...", "description": "..."}, {"titre": "...", "description": "..."}, {"titre": "...", "description": "..."}]`;
+[{"titre": "...", "description": "...", "actions": ["...", "..."], "outils": ["..."]}, {"titre": "...", "description": "...", "actions": ["...", "..."], "outils": ["..."]}, {"titre": "...", "description": "...", "actions": ["...", "..."], "outils": ["..."]}]`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -42,7 +48,7 @@ Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown ni texte autour :
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
+        max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -55,7 +61,7 @@ Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown ni texte autour :
     const data = await res.json();
     const rawText: string = data.content?.[0]?.text ?? "[]";
 
-    let themes: Array<{ titre: string; description: string }> = [];
+    let themes: Array<{ titre: string; description: string; actions: string[]; outils: string[] }> = [];
     try {
       themes = JSON.parse(rawText);
     } catch {

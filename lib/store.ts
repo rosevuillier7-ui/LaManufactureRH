@@ -167,6 +167,8 @@ export interface Placement {
 export interface DebriefTheme {
   titre: string;
   description: string;
+  actions: string[];
+  outils: string[];
 }
 
 export interface AppData {
