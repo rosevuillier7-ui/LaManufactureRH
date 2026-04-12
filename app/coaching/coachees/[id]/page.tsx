@@ -9,6 +9,7 @@ import {
   getObjectiveByCoachee,
   upsertObjective,
   saveSessionDebrief,
+  createSession,
 } from "@/lib/db";
 import { Coachee, Session, CoachingObjective, DebriefTheme, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
@@ -21,7 +22,25 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   LinkIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
+
+const dureeOptions = [30, 45, 60, 90, 120];
+
+const emptySessionForm = (coacheeId: string): Omit<Session, "id"> => ({
+  coacheeId,
+  date: new Date().toISOString().split("T")[0],
+  duree: 60,
+  resume: "",
+  pointsCles: "",
+  prochainRdv: "",
+  numeroSeance: 0,
+  objectifSeance: "",
+  bienMarche: "",
+  ceQuiBloque: "",
+  actionSuivante: "",
+  niveauEnergie: 0,
+});
 
 type CoachingStatut = "actif" | "terminé" | "pause";
 const statusLabel: Record<CoachingStatut, string> = { actif: "Actif", terminé: "Terminé", pause: "En pause" };
@@ -265,6 +284,8 @@ export default function CoacheeDetailPage() {
   const [objSaving, setObjSaving] = useState(false);
   const [objSaved, setObjSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [sessionForm, setSessionForm] = useState<Omit<Session, "id">>(emptySessionForm(""));
 
   useEffect(() => {
     async function load() {
@@ -301,6 +322,19 @@ export default function CoacheeDetailPage() {
     } finally {
       setObjSaving(false);
     }
+  }
+
+  function openNewSession() {
+    setSessionForm(emptySessionForm(id));
+    setModal(true);
+  }
+
+  async function saveSession() {
+    const numeroSeance = sessions.length + 1;
+    await createSession({ ...sessionForm, id: generateId(), numeroSeance });
+    const updated = await getSessionsByCoachee(id);
+    setSessions(updated);
+    setModal(false);
   }
 
   if (loading) return null;
@@ -425,9 +459,18 @@ export default function CoacheeDetailPage() {
 
       {/* Sessions list */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
-          Séances {sessions.length > 0 && <span className="text-gray-400 font-normal">({sessions.length})</span>}
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700">
+            Séances {sessions.length > 0 && <span className="text-gray-400 font-normal">({sessions.length})</span>}
+          </h2>
+          <button
+            onClick={openNewSession}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Nouvelle séance
+          </button>
+        </div>
         {sessions.length === 0 ? (
           <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-gray-100">
             <p className="text-3xl mb-2">📋</p>
@@ -441,6 +484,74 @@ export default function CoacheeDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Modal — nouvelle séance */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold">Nouvelle séance</h2>
+            </div>
+            <div className="overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Date</label>
+                  <input className="input" type="date" value={sessionForm.date} onChange={e => setSessionForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Durée</label>
+                  <select className="input" value={sessionForm.duree} onChange={e => setSessionForm(f => ({ ...f, duree: Number(e.target.value) }))}>
+                    {dureeOptions.map(d => <option key={d} value={d}>{d} min</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Niveau d&apos;énergie du coaché</label>
+                  <select className="input" value={sessionForm.niveauEnergie} onChange={e => setSessionForm(f => ({ ...f, niveauEnergie: Number(e.target.value) }))}>
+                    <option value={0}>— Non défini</option>
+                    <option value={1}>1 — Très bas</option>
+                    <option value={2}>2 — Bas</option>
+                    <option value={3}>3 — Moyen</option>
+                    <option value={4}>4 — Élevé</option>
+                    <option value={5}>5 — Excellent</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Prochain RDV</label>
+                  <input className="input" type="date" value={sessionForm.prochainRdv ?? ""} onChange={e => setSessionForm(f => ({ ...f, prochainRdv: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Objectif de la séance</label>
+                  <input className="input" value={sessionForm.objectifSeance} onChange={e => setSessionForm(f => ({ ...f, objectifSeance: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Ce qui a bien marché</label>
+                  <textarea className="input resize-none" rows={2} value={sessionForm.bienMarche} onChange={e => setSessionForm(f => ({ ...f, bienMarche: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Ce qui bloque</label>
+                  <textarea className="input resize-none" rows={2} value={sessionForm.ceQuiBloque} onChange={e => setSessionForm(f => ({ ...f, ceQuiBloque: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Action pour la prochaine séance</label>
+                  <textarea className="input resize-none" rows={2} value={sessionForm.actionSuivante} onChange={e => setSessionForm(f => ({ ...f, actionSuivante: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Résumé général</label>
+                  <textarea className="input resize-none" rows={2} value={sessionForm.resume} onChange={e => setSessionForm(f => ({ ...f, resume: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Points clés</label>
+                  <textarea className="input resize-none" rows={2} value={sessionForm.pointsCles} onChange={e => setSessionForm(f => ({ ...f, pointsCles: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Annuler</button>
+              <button onClick={saveSession} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
