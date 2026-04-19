@@ -5,11 +5,19 @@ import { supabase } from "@/lib/supabase";
 import {
   getAllClients, getAllMissions, getAllCandidats, getAllCoachees,
   getAllSessions, getAllPosts, getAllEpisodes, getAllProspects,
+  getAllInstagramStats,
 } from "@/lib/db";
-import { Client, Mission, Candidat, Coachee, Session, PostLinkedIn, Episode, Prospect } from "@/lib/store";
+import { Client, Mission, Candidat, Coachee, Session, PostLinkedIn, Episode, Prospect, InstagramStat } from "@/lib/store";
 import StatCard from "@/components/StatCard";
 import Badge from "@/components/Badge";
 import Link from "next/link";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+
+const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
+
+function daysSince(date: string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+}
 
 export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -20,12 +28,14 @@ export default function Home() {
   const [posts, setPosts] = useState<PostLinkedIn[]>([]);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [instagramStats, setInstagramStats] = useState<InstagramStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [cl, mi, ca, co, se, po, ep, pr] = await Promise.all([
+    const [cl, mi, ca, co, se, po, ep, pr, ig] = await Promise.all([
       getAllClients(), getAllMissions(), getAllCandidats(), getAllCoachees(),
       getAllSessions(), getAllPosts(), getAllEpisodes(), getAllProspects(),
+      getAllInstagramStats(),
     ]);
     setClients(cl);
     setMissions(mi);
@@ -35,6 +45,7 @@ export default function Home() {
     setPosts(po);
     setEpisodes(ep);
     setProspects(pr);
+    setInstagramStats(ig);
     setLoading(false);
   }
 
@@ -50,23 +61,42 @@ export default function Home() {
       .on("postgres_changes", { event: "*", schema: "public", table: "linkedin_posts" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "podcast_episodes" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "instagram_stats" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
   if (loading) return null;
 
+  // Commercial metrics
+  const prospectsActifs = prospects.filter(
+    (p) => p.statut !== "Signé" && p.statut !== "Perdu"
+  );
+  const clientsActifs = prospects.filter((p) => p.statut === "Signé");
+  const caPrevProspects = prospects.filter(
+    (p) => p.statut === "Proposition envoyée" || p.statut === "Signé"
+  );
+  const caPrev = caPrevProspects.reduce((sum, p) => {
+    const val = parseFloat((p.valeurEstimee ?? "").replace(/[^\d.]/g, ""));
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+
+  // Clients with unpaid status
+  const impayes = clientsActifs.filter((c) => c.statutPaiement === "Impayé");
+
+  // Existing metrics
   const missionsOuvertes = missions.filter(
     (m) => m.statut === "ouverte" || m.statut === "en_cours"
   ).length;
-  const clientsActifs = clients.filter((c) => c.statut === "actif").length;
   const coacheesActifs = coachees.filter((c) => c.statut === "actif").length;
-  const prospectsActifs = prospects.filter(
-    (p) => p.statut !== "Signé" && p.statut !== "Perdu"
-  ).length;
   const totalVues = posts.reduce((sum, p) => sum + p.vues, 0);
   const totalEcoutes = episodes.reduce((sum, e) => sum + e.ecoutes, 0);
   const episodesPubliés = episodes.filter((e) => e.statut === "publié").length;
+
+  // Instagram metrics
+  const igSorted = [...instagramStats].sort((a, b) => b.month.localeCompare(a.month));
+  const igLatest = igSorted[0] ?? null;
+  const igCurrentMonth = instagramStats.find((s) => s.month === CURRENT_MONTH) ?? null;
 
   const today = new Date().toISOString().split("T")[0];
   const prochainRdv = sessions
@@ -92,10 +122,82 @@ export default function Home() {
         </p>
       </div>
 
+      {/* Commercial section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Commercial</h2>
+          <Link href="/commercial" className="text-xs text-indigo-600 hover:underline">
+            Voir tout →
+          </Link>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <Link href="/commercial/prospects" className="block">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-indigo-200 transition-colors">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Prospects actifs</p>
+              <p className="text-3xl font-bold text-gray-900">{prospectsActifs.length}</p>
+              <p className="text-xs text-gray-400 mt-1">en pipeline</p>
+            </div>
+          </Link>
+          <Link href="/commercial/clients" className="block">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-indigo-200 transition-colors">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Clients actifs</p>
+              <p className="text-3xl font-bold text-gray-900">{clientsActifs.length}</p>
+              <p className="text-xs text-gray-400 mt-1">contrats signés</p>
+            </div>
+          </Link>
+          <Link href="/commercial" className="block">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-indigo-200 transition-colors">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">CA prévisionnel</p>
+              {caPrev > 0 ? (
+                <p className="text-3xl font-bold text-gray-900">
+                  {caPrev.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
+                </p>
+              ) : (
+                <p className="text-3xl font-bold text-gray-900">{caPrevProspects.length}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">proposition + signés</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Alert: Clients en retard de paiement */}
+      {impayes.length > 0 && (
+        <div className="mb-8 bg-red-50 border border-red-200 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <h2 className="text-sm font-semibold text-red-700">
+              Clients en retard de paiement ({impayes.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {impayes.map((c) => {
+              const daysSigned = c.signedAt ? daysSince(c.signedAt) : null;
+              return (
+                <Link key={c.id} href="/commercial/clients" className="block">
+                  <div className="bg-white rounded-xl p-3 border border-red-100 hover:border-red-300 transition-colors flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{c.nomContact}</p>
+                      <p className="text-xs text-gray-500 truncate">{c.entreprise}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      {c.valeurEstimee && (
+                        <p className="text-sm font-semibold text-red-700">{c.valeurEstimee}</p>
+                      )}
+                      {daysSigned !== null && (
+                        <p className="text-xs text-red-500">Signé il y a {daysSigned}j</p>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Clients actifs" value={clientsActifs} color="indigo" />
-        <StatCard label="Prospects actifs" value={prospectsActifs} color="amber" />
         <StatCard label="Missions ouvertes" value={missionsOuvertes} color="amber" />
         <StatCard label="Candidats" value={candidats.length} color="gray" />
         <StatCard label="Coachés actifs" value={coacheesActifs} color="emerald" />
@@ -234,29 +336,44 @@ export default function Home() {
           </div>
         </div>
 
-        {/* LinkedIn derniers posts */}
+        {/* Récap Instagram */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">LinkedIn · Derniers posts</h2>
-            <Link href="/linkedin" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
+            <h2 className="font-semibold text-gray-900">Récap Instagram</h2>
+            <Link href="/instagram" className="text-xs text-indigo-600 hover:underline py-2 px-1 -my-2 -mx-1">
               Voir tout
             </Link>
           </div>
-          <div className="space-y-3">
-            {posts.slice(0, 3).map((post) => (
-              <div key={post.id} className="border-b border-gray-50 pb-3 last:border-b-0 last:pb-0">
-                <p className="text-sm text-gray-700 line-clamp-2">{post.contenu}</p>
-                <div className="flex gap-3 mt-1 text-xs text-gray-400">
-                  <span>{post.vues.toLocaleString("fr-FR")} vues</span>
-                  <span>{post.likes} likes</span>
-                  <span>{post.commentaires} comm.</span>
-                  <span className="ml-auto text-indigo-500 font-medium">
-                    {post.taux_engagement}%
-                  </span>
-                </div>
+          {igLatest ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Abonnés</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {igLatest.abonnes.toLocaleString("fr-FR")}
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">DM reçus ce mois</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {igCurrentMonth?.dmsRecus ?? 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">DM convertis en RDV</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {igCurrentMonth?.dmsConvertis ?? 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Abonnés qualifiés ce mois</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {igCurrentMonth?.prospectsGeneres ?? 0}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Aucune donnée Instagram</p>
+          )}
         </div>
 
         {/* Prochain RDV coaching */}
