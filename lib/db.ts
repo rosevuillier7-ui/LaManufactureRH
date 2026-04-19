@@ -163,6 +163,16 @@ export async function createProspectAction(a: ProspectAction): Promise<void> {
   if (error) throw error;
 }
 
+export async function getRecentActions(limit = 10): Promise<ProspectAction[]> {
+  const { data, error } = await supabase
+    .from("prospect_actions")
+    .select("*")
+    .order("date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(fromDbAction);
+}
+
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
