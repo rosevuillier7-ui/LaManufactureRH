@@ -14,6 +14,7 @@ import type {
   CoachingObjective,
   Placement,
   DebriefTheme,
+  InstagramStat,
 } from "./store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -730,5 +731,71 @@ export async function updatePlacementStartDate(
       cal_event_j_plus_76_id: eventIds.calEventJPlus76Id,
     })
     .eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Instagram Stats ──────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromDbInstagramStat(row: any): InstagramStat {
+  return {
+    id: str(row.id),
+    month: str(row.month),
+    abonnes: num(row.abonnes),
+    dmsRecus: num(row.dms_recus),
+    dmsConvertis: num(row.dms_convertis),
+    prospectsGeneres: num(row.prospects_generes),
+    postsPublies: num(row.posts_publies),
+    reelsPublies: num(row.reels_publies),
+    bestPostUrl: str(row.best_post_url),
+    bestPostNotes: str(row.best_post_notes),
+    createdAt: str(row.created_at),
+  };
+}
+
+function toDbInstagramStat(s: InstagramStat) {
+  return {
+    id: s.id,
+    month: s.month,
+    abonnes: s.abonnes,
+    dms_recus: s.dmsRecus,
+    dms_convertis: s.dmsConvertis,
+    prospects_generes: s.prospectsGeneres,
+    posts_publies: s.postsPublies,
+    reels_publies: s.reelsPublies,
+    best_post_url: toNullable(s.bestPostUrl),
+    best_post_notes: toNullable(s.bestPostNotes),
+  };
+}
+
+export async function getAllInstagramStats(): Promise<InstagramStat[]> {
+  const { data, error } = await supabase
+    .from("instagram_stats")
+    .select("*")
+    .order("month", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbInstagramStat);
+}
+
+export async function createInstagramStat(s: InstagramStat): Promise<InstagramStat> {
+  const { data, error } = await supabase
+    .from("instagram_stats")
+    .insert(toDbInstagramStat(s))
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDbInstagramStat(data);
+}
+
+export async function updateInstagramStat(id: string, s: InstagramStat): Promise<void> {
+  const { error } = await supabase
+    .from("instagram_stats")
+    .update(toDbInstagramStat(s))
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function removeInstagramStat(id: string): Promise<void> {
+  const { error } = await supabase.from("instagram_stats").delete().eq("id", id);
   if (error) throw error;
 }

@@ -182,6 +182,20 @@ export interface DebriefTheme {
   outils: string[];
 }
 
+export interface InstagramStat {
+  id: string;
+  month: string; // "2026-04"
+  abonnes: number;
+  dmsRecus: number;
+  dmsConvertis: number;
+  prospectsGeneres: number;
+  postsPublies: number;
+  reelsPublies: number;
+  bestPostUrl: string;
+  bestPostNotes: string;
+  createdAt?: string;
+}
+
 export interface AppData {
   clients: Client[];
   missions: Mission[];

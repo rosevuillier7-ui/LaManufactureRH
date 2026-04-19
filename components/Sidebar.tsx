@@ -11,6 +11,7 @@ import {
   CpuChipIcon,
   ChevronRightIcon,
   BuildingOffice2Icon,
+  CameraIcon,
 } from "@heroicons/react/24/outline";
 
 const nav = [
@@ -52,6 +53,11 @@ const nav = [
     label: "LinkedIn",
     href: "/linkedin",
     icon: SparklesIcon,
+  },
+  {
+    label: "Instagram",
+    href: "/instagram",
+    icon: CameraIcon,
   },
   {
     label: "Podcast 13ème Mois",
