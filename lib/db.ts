@@ -15,6 +15,7 @@ import type {
   Placement,
   DebriefTheme,
   InstagramStat,
+  PodcastSponsor,
 } from "./store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -797,5 +798,65 @@ export async function updateInstagramStat(id: string, s: InstagramStat): Promise
 
 export async function removeInstagramStat(id: string): Promise<void> {
   const { error } = await supabase.from("instagram_stats").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Podcast Sponsors ─────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromDbSponsor(row: any): PodcastSponsor {
+  return {
+    id: str(row.id),
+    episode_id: nullable(row.episode_id),
+    nom_sponsor: str(row.nom_sponsor),
+    brief_client: nullable(row.brief_client),
+    linkedin_post_done: !!(row.linkedin_post_done),
+    youtube_description_done: !!(row.youtube_description_done),
+    date_diffusion: nullable(row.date_diffusion),
+    created_at: str(row.created_at),
+  };
+}
+
+function toDbSponsor(s: PodcastSponsor) {
+  return {
+    id: s.id,
+    episode_id: toNullable(s.episode_id),
+    nom_sponsor: s.nom_sponsor,
+    brief_client: toNullable(s.brief_client),
+    linkedin_post_done: s.linkedin_post_done,
+    youtube_description_done: s.youtube_description_done,
+    date_diffusion: toNullable(s.date_diffusion),
+  };
+}
+
+export async function getAllSponsors(): Promise<PodcastSponsor[]> {
+  const { data, error } = await supabase
+    .from("podcast_sponsors")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbSponsor);
+}
+
+export async function createSponsor(s: PodcastSponsor): Promise<PodcastSponsor> {
+  const { data, error } = await supabase.from("podcast_sponsors").insert(toDbSponsor(s)).select().single();
+  if (error) throw error;
+  return fromDbSponsor(data);
+}
+
+export async function updateSponsor(id: string, s: Partial<PodcastSponsor>): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (s.episode_id !== undefined) patch.episode_id = toNullable(s.episode_id);
+  if (s.nom_sponsor !== undefined) patch.nom_sponsor = s.nom_sponsor;
+  if (s.brief_client !== undefined) patch.brief_client = toNullable(s.brief_client);
+  if (s.linkedin_post_done !== undefined) patch.linkedin_post_done = s.linkedin_post_done;
+  if (s.youtube_description_done !== undefined) patch.youtube_description_done = s.youtube_description_done;
+  if (s.date_diffusion !== undefined) patch.date_diffusion = toNullable(s.date_diffusion);
+  const { error } = await supabase.from("podcast_sponsors").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function removeSponsor(id: string): Promise<void> {
+  const { error } = await supabase.from("podcast_sponsors").delete().eq("id", id);
   if (error) throw error;
 }

@@ -4,8 +4,11 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
 
+  const rawState = searchParams.get("state");
+  const from = rawState ? decodeURIComponent(rawState) : "/recrutement/suivi";
+
   if (!code || searchParams.get("error")) {
-    return NextResponse.redirect(new URL("/recrutement/suivi?gcal_error=1", origin));
+    return NextResponse.redirect(new URL(`${from}?gcal_error=1`, origin));
   }
 
   const redirectUri = `${origin}/api/gcal/auth/callback`;

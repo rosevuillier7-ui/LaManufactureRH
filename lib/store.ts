@@ -182,6 +182,17 @@ export interface DebriefTheme {
   outils: string[];
 }
 
+export interface PodcastSponsor {
+  id: string;
+  episode_id?: string;
+  nom_sponsor: string;
+  brief_client?: string;
+  linkedin_post_done: boolean;
+  youtube_description_done: boolean;
+  date_diffusion?: string;
+  created_at?: string;
+}
+
 export interface InstagramStat {
   id: string;
   month: string; // "2026-04"
