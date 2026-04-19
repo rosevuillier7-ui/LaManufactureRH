@@ -48,8 +48,16 @@ function fromDbProspect(row: any): Prospect {
     email: nullable(row.email),
     linkedin: nullable(row.linkedin),
     typeService: nullable(row.type_service) as TypeService | undefined,
+    typeServiceAutre: nullable(row.type_service_autre),
     valeurEstimee: nullable(row.valeur_estimee),
     prochainRdv: nullable(row.prochain_rdv),
+    secteurActivite: nullable(row.secteur_activite),
+    typeContact: nullable(row.type_contact),
+    resultat: nullable(row.resultat),
+    todo: nullable(row.todo),
+    todoDate: nullable(row.todo_date),
+    statutPaiement: str(row.statut_paiement) || "Payé",
+    signedAt: nullable(row.signed_at),
   };
 }
 
@@ -66,13 +74,41 @@ function toDbProspect(p: Prospect) {
     email: toNullable(p.email),
     linkedin: toNullable(p.linkedin),
     type_service: toNullable(p.typeService),
+    type_service_autre: toNullable(p.typeServiceAutre),
     valeur_estimee: toNullable(p.valeurEstimee),
     prochain_rdv: toNullable(p.prochainRdv),
+    secteur_activite: toNullable(p.secteurActivite),
+    type_contact: toNullable(p.typeContact),
+    resultat: toNullable(p.resultat),
+    todo: toNullable(p.todo),
+    todo_date: toNullable(p.todoDate),
+    statut_paiement: p.statutPaiement ?? "Payé",
+    signed_at: toNullable(p.signedAt),
   };
 }
 
 export async function getAllProspects(): Promise<Prospect[]> {
   const { data, error } = await supabase.from("prospects").select("*").order("dernier_contact", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbProspect);
+}
+
+export async function getActiveProspects(): Promise<Prospect[]> {
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .neq("statut", "Signé")
+    .order("dernier_contact", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromDbProspect);
+}
+
+export async function getSignedClients(): Promise<Prospect[]> {
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .eq("statut", "Signé")
+    .order("signed_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(fromDbProspect);
 }

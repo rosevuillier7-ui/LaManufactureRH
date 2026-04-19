@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function ProspectsLegacyRedirect() {
+export default function CommercialPage() {
   redirect("/commercial/prospects");
 }

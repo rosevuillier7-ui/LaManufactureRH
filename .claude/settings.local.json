@@ -14,7 +14,9 @@
       "Bash(find:*)",
       "Bash(node:*)",
       "Bash(git push:*)",
-      "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")",
+      "Bash(git -C /Users/rosevuillier/Documents/Github/LaManufactureRH log --oneline --all)",
+      "Bash(git:*)"
     ]
   }
 }

@@ -46,7 +46,7 @@ export interface Candidat {
   notes: string;
 }
 
-export type TypeService = "Recrutement" | "Coaching" | "Les deux";
+export type TypeService = "Recrutement" | "Coaching" | "Les deux" | "Autre";
 
 export interface Prospect {
   id: string;
@@ -60,8 +60,17 @@ export interface Prospect {
   email?: string;
   linkedin?: string;
   typeService?: TypeService;
+  typeServiceAutre?: string;
   valeurEstimee?: string;
   prochainRdv?: string;
+  // Extended fields
+  secteurActivite?: string;
+  typeContact?: string;
+  resultat?: string;
+  todo?: string;
+  todoDate?: string;
+  statutPaiement?: string;
+  signedAt?: string;
 }
 
 export type ActionType = "contact" | "relance" | "statut" | "note" | "Appel" | "Email" | "RDV" | "Note";

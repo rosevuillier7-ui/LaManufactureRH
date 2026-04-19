@@ -31,9 +31,13 @@ const nav = [
     ],
   },
   {
-    label: "Prospects",
-    href: "/prospects",
+    label: "Commercial",
+    href: "/commercial",
     icon: BuildingOffice2Icon,
+    children: [
+      { label: "Prospects", href: "/commercial/prospects" },
+      { label: "Clients", href: "/commercial/clients" },
+    ],
   },
   {
     label: "Coaching",
