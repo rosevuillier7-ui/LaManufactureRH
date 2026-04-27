@@ -32,7 +32,7 @@ function splitName(fullName: string): { prenom: string; nom: string } {
 
 async function tryFetch(url: string, apiKey: string) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), 30_000);
   let res: Response;
   try {
     res = await fetch(url, {
