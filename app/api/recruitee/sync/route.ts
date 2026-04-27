@@ -5,23 +5,26 @@ export const maxDuration = 60;
 
 const RECRUITEE_BASE = "https://api.recruitee.com/c";
 
-interface RecruiteeOffer {
-  title?: string;
-  department?: string;
-  city?: string;
-}
-
-interface RecruiteeApplication {
-  stage?: string;
-  disqualified?: boolean;
-  offer?: RecruiteeOffer;
+interface RecruiteePlacement {
+  id: number | string;
+  candidate_id: number | string;
+  offer_id: number | string;
+  hired_at?: string | null;
+  starts_at?: string | null;
+  job_starts_at?: string | null;
 }
 
 interface RecruiteeCandidate {
-  id: number | string;
+  id?: number | string;
   name?: string;
-  hired_at?: string | null;
-  applications?: RecruiteeApplication[];
+  email?: string;
+  phone?: string;
+}
+
+interface RecruiteeOffer {
+  id?: number | string;
+  title?: string;
+  department?: string;
 }
 
 function splitName(fullName: string): { prenom: string; nom: string } {
@@ -30,9 +33,9 @@ function splitName(fullName: string): { prenom: string; nom: string } {
   return { prenom: parts[0], nom: parts.slice(1).join(" ") };
 }
 
-async function tryFetch(url: string, apiKey: string) {
+async function apiFetch(url: string, apiKey: string): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), 25_000);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -43,9 +46,8 @@ async function tryFetch(url: string, apiKey: string) {
     clearTimeout(timeout);
   }
   console.log(`[recruitee/sync] GET ${url} → HTTP ${res.status}`);
-  const text = await res.text();
-  console.log(`[recruitee/sync] response body (first 800 chars):`, text.slice(0, 800));
-  return { ok: res.ok, status: res.status, text };
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.json();
 }
 
 export async function POST() {
@@ -56,97 +58,65 @@ export async function POST() {
     return NextResponse.json({ error: "Recruitee credentials not configured" }, { status: 500 });
   }
 
-  // Try each endpoint in order; use the first that returns an array of objects
-  const endpointCandidates = [
-    `${RECRUITEE_BASE}/${companyId}/candidates?per_page=25`,
-    `${RECRUITEE_BASE}/${companyId}/placements?per_page=25`,
-    `${RECRUITEE_BASE}/${companyId}/candidates/search?per_page=25`,
-  ];
+  const placementsUrl = `${RECRUITEE_BASE}/${companyId}/placements?per_page=100`;
 
-  let rawText = "";
-  let url = "";
-  let responseStatus = 0;
-
-  for (const endpoint of endpointCandidates) {
-    const result = await tryFetch(endpoint, apiKey);
-    rawText = result.text;
-    url = endpoint;
-    responseStatus = result.status;
-
-    if (!result.ok) {
-      console.log(`[recruitee/sync] skipping ${endpoint} (non-OK status)`);
-      continue;
-    }
-
-    let parsed: unknown;
-    try { parsed = JSON.parse(rawText); } catch { continue; }
-
-    console.log(`[recruitee/sync] top-level keys for ${endpoint}:`, Object.keys(parsed as object));
-
-    // Look for an array-valued key that contains objects (likely candidates/placements)
-    const firstArrayKey = Object.entries(parsed as Record<string, unknown>).find(
-      ([, v]) => Array.isArray(v) && (v as unknown[]).length > 0 && typeof (v as unknown[])[0] === "object"
-    )?.[0];
-
-    if (firstArrayKey) {
-      console.log(`[recruitee/sync] using key "${firstArrayKey}" from ${endpoint}`);
-      const firstItem = (parsed as Record<string, unknown[]>)[firstArrayKey][0];
-      console.log(`[recruitee/sync] first item keys:`, Object.keys(firstItem as object));
-      console.log(`[recruitee/sync] first item (full):`, JSON.stringify(firstItem, null, 2).slice(0, 1500));
-      break;
-    }
-
-    console.log(`[recruitee/sync] no candidate array found in ${endpoint}, trying next`);
+  let placementsBody: Record<string, unknown>;
+  try {
+    placementsBody = (await apiFetch(placementsUrl, apiKey)) as Record<string, unknown>;
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to fetch placements", detail: String(err) }, { status: 502 });
   }
 
-  // Re-parse and extract candidates from whichever endpoint worked
-  let body: Record<string, unknown>;
-  try { body = JSON.parse(rawText); } catch {
-    return NextResponse.json({ error: "Failed to parse Recruitee response", debug: { url, responseStatus, rawText: rawText.slice(0, 500) } }, { status: 502 });
-  }
+  console.log(`[recruitee/sync] topLevelKeys:`, Object.keys(placementsBody));
 
-  console.log(`[recruitee/sync] final top-level keys:`, Object.keys(body));
-
-  // Try common array keys in order of likelihood
-  const candidates: RecruiteeCandidate[] =
-    (body.candidates as RecruiteeCandidate[] | undefined) ??
-    (body.placements as RecruiteeCandidate[] | undefined) ??
-    (body.data as RecruiteeCandidate[] | undefined) ??
+  const placements: RecruiteePlacement[] =
+    (placementsBody.placements as RecruiteePlacement[] | undefined) ??
+    (placementsBody.data as RecruiteePlacement[] | undefined) ??
     [];
 
-  console.log("[recruitee/sync] total candidates from API (before filtering):", candidates.length);
+  console.log("[recruitee/sync] totalPlacements:", placements.length);
 
-  const HIRED_STAGES = new Set(["hired", "Hired", "engagé", "Engagé", "engage", "Engage", "embauché", "Embauché"]);
+  if (placements.length > 0) {
+    console.log("[recruitee/sync] first placement sample:", JSON.stringify(placements[0], null, 2).slice(0, 1000));
+  }
 
-  const allStages = [...new Set(
-    candidates.flatMap((c) => (c.applications ?? []).map((a) => a.stage ?? ""))
-  )];
-  console.log("[recruitee/sync] unique stages found:", allStages);
-
-  // Filter for candidates with a hired application (in case API returns more)
-  const hiredCandidates = candidates.filter((c) => {
-    if (c.hired_at) return true;
-    return (c.applications ?? []).some(
-      (a) => HIRED_STAGES.has(a.stage ?? "") && !a.disqualified
-    );
-  });
+  // Fetch all candidate and offer details in parallel
+  const fetched = await Promise.all(
+    placements.map(async (placement) => {
+      const [candidateBody, offerBody] = await Promise.all([
+        apiFetch(`${RECRUITEE_BASE}/${companyId}/candidates/${placement.candidate_id}`, apiKey).catch((e) => {
+          console.error(`[recruitee/sync] candidate ${placement.candidate_id} error:`, e);
+          return null;
+        }),
+        apiFetch(`${RECRUITEE_BASE}/${companyId}/offers/${placement.offer_id}`, apiKey).catch((e) => {
+          console.error(`[recruitee/sync] offer ${placement.offer_id} error:`, e);
+          return null;
+        }),
+      ]);
+      return { placement, candidateBody, offerBody };
+    })
+  );
 
   let synced = 0;
   const errors: string[] = [];
 
-  for (const candidate of hiredCandidates) {
+  for (const { placement, candidateBody, offerBody } of fetched) {
     try {
-      const { prenom, nom } = splitName(candidate.name ?? "");
+      // Recruitee wraps single resources: { candidate: {...} } and { offer: {...} }
+      const raw = candidateBody as Record<string, unknown> | null;
+      const candidate: RecruiteeCandidate =
+        (raw?.candidate as RecruiteeCandidate | undefined) ?? (raw as RecruiteeCandidate | null) ?? {};
 
-      // Get job info from the hired application's offer
-      const hiredApp = (candidate.applications ?? []).find(
-        (a) => HIRED_STAGES.has(a.stage ?? "") || !!candidate.hired_at
-      );
-      const poste = hiredApp?.offer?.title ?? "";
-      const entreprise = hiredApp?.offer?.department ?? "";
+      const rawOffer = offerBody as Record<string, unknown> | null;
+      const offer: RecruiteeOffer =
+        (rawOffer?.offer as RecruiteeOffer | undefined) ?? (rawOffer as RecruiteeOffer | null) ?? {};
+
+      const { prenom, nom } = splitName(candidate.name ?? "");
+      const poste = offer.title ?? "";
+      const entreprise = offer.department ?? "";
 
       await upsertPlacement({
-        recruiteeId: String(candidate.id),
+        recruiteeId: String(placement.id),
         nom,
         prenom,
         poste,
@@ -154,21 +124,18 @@ export async function POST() {
       });
       synced++;
     } catch (err) {
-      errors.push(`Candidate ${candidate.id}: ${String(err)}`);
+      errors.push(`Placement ${placement.id}: ${String(err)}`);
     }
   }
 
   return NextResponse.json({
     synced,
-    total: hiredCandidates.length,
+    total: placements.length,
     errors,
-    detectedStages: allStages,
     debug: {
-      url,
-      httpStatus: responseStatus,
-      responsePreview: rawText.slice(0, 500),
-      topLevelKeys: Object.keys(body),
-      totalCandidatesBeforeFilter: candidates.length,
+      url: placementsUrl,
+      topLevelKeys: Object.keys(placementsBody),
+      totalPlacements: placements.length,
     },
   });
 }
