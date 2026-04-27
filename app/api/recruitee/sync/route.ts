@@ -57,11 +57,18 @@ export async function POST() {
   const body = await res.json();
   const candidates: RecruiteeCandidate[] = body.candidates ?? [];
 
+  const HIRED_STAGES = new Set(["hired", "Hired", "engagé", "Engagé", "engage", "Engage", "embauché", "Embauché"]);
+
+  const allStages = [...new Set(
+    candidates.flatMap((c) => (c.applications ?? []).map((a) => a.stage ?? ""))
+  )];
+  console.log("[recruitee/sync] unique stages found:", allStages);
+
   // Filter for candidates with a hired application (in case API returns more)
   const hiredCandidates = candidates.filter((c) => {
     if (c.hired_at) return true;
     return (c.applications ?? []).some(
-      (a) => a.stage === "hired" && !a.disqualified
+      (a) => HIRED_STAGES.has(a.stage ?? "") && !a.disqualified
     );
   });
 
@@ -74,7 +81,7 @@ export async function POST() {
 
       // Get job info from the hired application's offer
       const hiredApp = (candidate.applications ?? []).find(
-        (a) => a.stage === "hired" || candidate.hired_at
+        (a) => HIRED_STAGES.has(a.stage ?? "") || !!candidate.hired_at
       );
       const poste = hiredApp?.offer?.title ?? "";
       const entreprise = hiredApp?.offer?.department ?? "";
@@ -92,5 +99,5 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({ synced, total: hiredCandidates.length, errors });
+  return NextResponse.json({ synced, total: hiredCandidates.length, errors, detectedStages: allStages });
 }
