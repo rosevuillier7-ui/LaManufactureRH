@@ -74,18 +74,18 @@ async function apiPost(url: string, apiKey: string, payload: unknown): Promise<u
   return res.json();
 }
 
-function getHiredPlacement(placements: CandidatePlacement[]): CandidatePlacement | undefined {
-  return placements.find((p) => p.hired_at != null);
+function getFirstPlacement(placements: CandidatePlacement[]): CandidatePlacement | undefined {
+  return placements[0];
 }
 
-async function fetchHiredCandidates(
+async function fetchAllCandidates(
   companyId: string,
   apiKey: string
 ): Promise<{ candidates: RecruiteeCandidate[]; url: string; body: Record<string, unknown>; usedFallback: boolean }> {
   const searchUrl = `${RECRUITEE_BASE}/${companyId}/search/new/candidates`;
 
   try {
-    const body = (await apiPost(searchUrl, apiKey, { limit: 100, hired: true })) as Record<string, unknown>;
+    const body = (await apiPost(searchUrl, apiKey, { limit: 100 })) as Record<string, unknown>;
     const hits = (body.hits as RecruiteeCandidate[] | undefined) ?? [];
     return { candidates: hits, url: searchUrl, body, usedFallback: false };
   } catch (err) {
@@ -99,8 +99,7 @@ async function fetchHiredCandidates(
   const fallbackUrl = `${RECRUITEE_BASE}/${companyId}/candidates?qualified=true&page=1&per_page=100`;
   const body = (await apiFetch(fallbackUrl, apiKey)) as Record<string, unknown>;
   const all = (body.candidates as RecruiteeCandidate[] | undefined) ?? [];
-  const hired = all.filter((c) => getHiredPlacement(c.placements ?? []) !== undefined);
-  return { candidates: hired, url: fallbackUrl, body, usedFallback: true };
+  return { candidates: all, url: fallbackUrl, body, usedFallback: true };
 }
 
 export async function POST() {
@@ -111,9 +110,9 @@ export async function POST() {
     return NextResponse.json({ error: "Recruitee credentials not configured" }, { status: 500 });
   }
 
-  let fetchResult: Awaited<ReturnType<typeof fetchHiredCandidates>>;
+  let fetchResult: Awaited<ReturnType<typeof fetchAllCandidates>>;
   try {
-    fetchResult = await fetchHiredCandidates(companyId, apiKey);
+    fetchResult = await fetchAllCandidates(companyId, apiKey);
   } catch (err) {
     return NextResponse.json({ error: "Failed to fetch candidates", detail: String(err) }, { status: 502 });
   }
@@ -125,17 +124,13 @@ export async function POST() {
   console.log(`[recruitee/sync] totalHits:`, totalHits, "| returned:", candidates.length);
 
   if (candidates.length > 0) {
-    const sample = candidates[0];
-    console.log(
-      `[recruitee/sync] first hit sample:`,
-      JSON.stringify({ id: sample.id, name: sample.name, placements: sample.placements }, null, 2).slice(0, 1000)
-    );
+    console.log(`[recruitee/sync] first hit FULL JSON:`, JSON.stringify(candidates[0], null, 2));
   }
 
-  // Fetch offer details in parallel for each hired candidate
+  // Fetch offer details in parallel for all candidates
   const enriched = await Promise.all(
     candidates.map(async (candidate) => {
-      const placement = getHiredPlacement(candidate.placements ?? []);
+      const placement = getFirstPlacement(candidate.placements ?? []);
 
       let offerBody: unknown = null;
       if (placement?.offer_id != null) {
