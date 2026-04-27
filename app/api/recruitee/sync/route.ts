@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { upsertPlacement } from "@/lib/db";
 
+export const maxDuration = 60;
+
 const RECRUITEE_BASE = "https://api.recruitee.com/c";
 
 interface RecruiteeOffer {
@@ -29,9 +31,17 @@ function splitName(fullName: string): { prenom: string; nom: string } {
 }
 
 async function tryFetch(url: string, apiKey: string) {
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   console.log(`[recruitee/sync] GET ${url} → HTTP ${res.status}`);
   const text = await res.text();
   console.log(`[recruitee/sync] response body (first 800 chars):`, text.slice(0, 800));
@@ -48,9 +58,9 @@ export async function POST() {
 
   // Try each endpoint in order; use the first that returns an array of objects
   const endpointCandidates = [
-    `${RECRUITEE_BASE}/${companyId}/candidates?per_page=100`,
-    `${RECRUITEE_BASE}/${companyId}/placements?per_page=100`,
-    `${RECRUITEE_BASE}/${companyId}/candidates/search?per_page=100`,
+    `${RECRUITEE_BASE}/${companyId}/candidates?per_page=25`,
+    `${RECRUITEE_BASE}/${companyId}/placements?per_page=25`,
+    `${RECRUITEE_BASE}/${companyId}/candidates/search?per_page=25`,
   ];
 
   let rawText = "";
