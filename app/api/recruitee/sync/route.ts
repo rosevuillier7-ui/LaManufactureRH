@@ -5,10 +5,15 @@ export const maxDuration = 60;
 
 const RECRUITEE_BASE = "https://api.recruitee.com/c";
 
+interface PlacementOffer {
+  id: number;
+  title: string;
+}
+
 interface CandidatePlacement {
-  offer_id: number | string;
+  is_hired: boolean;
+  offer: PlacementOffer;
   hired_at?: string | null;
-  hired_in_this_placement?: boolean;
   job_starts_at?: string | null;
 }
 
@@ -18,12 +23,6 @@ interface RecruiteeCandidate {
   emails?: string[];
   phones?: string[];
   placements?: CandidatePlacement[];
-}
-
-interface RecruiteeOffer {
-  title?: string;
-  department?: string;
-  company_name?: string;
 }
 
 class HttpError extends Error {
@@ -74,10 +73,6 @@ async function apiPost(url: string, apiKey: string, payload: unknown): Promise<u
   return res.json();
 }
 
-function getFirstPlacement(placements: CandidatePlacement[]): CandidatePlacement | undefined {
-  return placements[0];
-}
-
 async function fetchAllCandidates(
   companyId: string,
   apiKey: string
@@ -85,7 +80,7 @@ async function fetchAllCandidates(
   const searchUrl = `${RECRUITEE_BASE}/${companyId}/search/new/candidates`;
 
   try {
-    const body = (await apiPost(searchUrl, apiKey, { limit: 100 })) as Record<string, unknown>;
+    const body = (await apiPost(searchUrl, apiKey, { limit: 200 })) as Record<string, unknown>;
     const hits = (body.hits as RecruiteeCandidate[] | undefined) ?? [];
     return { candidates: hits, url: searchUrl, body, usedFallback: false };
   } catch (err) {
@@ -96,7 +91,7 @@ async function fetchAllCandidates(
     }
   }
 
-  const fallbackUrl = `${RECRUITEE_BASE}/${companyId}/candidates?qualified=true&page=1&per_page=100`;
+  const fallbackUrl = `${RECRUITEE_BASE}/${companyId}/candidates?qualified=true&page=1&per_page=200`;
   const body = (await apiFetch(fallbackUrl, apiKey)) as Record<string, unknown>;
   const all = (body.candidates as RecruiteeCandidate[] | undefined) ?? [];
   return { candidates: all, url: fallbackUrl, body, usedFallback: true };
@@ -127,50 +122,38 @@ export async function POST() {
     console.log(`[recruitee/sync] first hit FULL JSON:`, JSON.stringify(candidates[0], null, 2));
   }
 
-  // Fetch offer details in parallel for all candidates
-  const enriched = await Promise.all(
-    candidates.map(async (candidate) => {
-      const placement = getFirstPlacement(candidate.placements ?? []);
-
-      let offerBody: unknown = null;
-      if (placement?.offer_id != null) {
-        try {
-          offerBody = await apiFetch(
-            `${RECRUITEE_BASE}/${companyId}/offers/${placement.offer_id}`,
-            apiKey
-          );
-        } catch (e) {
-          console.error(`[recruitee/sync] offer ${placement.offer_id} fetch failed:`, e);
-        }
-      } else {
-        console.log(`[recruitee/sync] candidate ${candidate.id} — no offer_id, skipping offer fetch`);
-      }
-
-      return { candidate, placement, offerBody };
-    })
+  const hiredCandidates = candidates.filter((c) =>
+    (c.placements ?? []).some((p) => p.is_hired === true)
   );
+
+  console.log(`[recruitee/sync] hired candidates found: ${hiredCandidates.length}`);
 
   let synced = 0;
   const errors: string[] = [];
 
-  for (const item of enriched) {
-    const { candidate, placement, offerBody } = item;
+  for (const candidate of hiredCandidates) {
     try {
-      const rawOffer = offerBody as Record<string, unknown> | null;
-      const offer: RecruiteeOffer =
-        (rawOffer?.offer as RecruiteeOffer | undefined) ?? (rawOffer as RecruiteeOffer | null) ?? {};
+      const hiredPlacement = (candidate.placements ?? []).find((p) => p.is_hired === true)!;
+      const email = candidate.emails?.[0] ?? null;
+      const phone = candidate.phones?.[0] ?? null;
+
+      console.log(
+        `[recruitee/sync] saving candidate ${candidate.id}` +
+          ` — job: ${hiredPlacement.offer?.title}` +
+          ` | hired_at: ${hiredPlacement.hired_at}` +
+          ` | email: ${email}` +
+          ` | phone: ${phone}`
+      );
 
       const { prenom, nom } = splitName(candidate.name ?? "");
-      const poste = offer.title ?? "";
-      const entreprise = offer.department ?? offer.company_name ?? "";
 
       await upsertPlacement({
         recruiteeId: String(candidate.id),
         nom,
         prenom,
-        poste,
-        entreprise,
-        startDate: placement?.hired_at ?? placement?.job_starts_at ?? null,
+        poste: hiredPlacement.offer?.title ?? "",
+        entreprise: "",
+        startDate: hiredPlacement.hired_at ?? null,
       });
       synced++;
     } catch (err) {
@@ -181,6 +164,7 @@ export async function POST() {
   return NextResponse.json({
     synced,
     total: candidates.length,
+    hiredFound: hiredCandidates.length,
     errors,
     debug: {
       url: usedUrl,
