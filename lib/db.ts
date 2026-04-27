@@ -691,19 +691,19 @@ export async function upsertPlacement(p: {
   prenom: string;
   poste: string;
   entreprise: string;
+  startDate?: string | null;
 }): Promise<Placement> {
+  const row: Record<string, unknown> = {
+    recruitee_id: p.recruiteeId,
+    nom: p.nom,
+    prenom: p.prenom,
+    poste: p.poste,
+    entreprise: p.entreprise,
+  };
+  if (p.startDate) row.date_prise_de_poste = p.startDate;
   const { data, error } = await supabase
     .from("placements")
-    .upsert(
-      {
-        recruitee_id: p.recruiteeId,
-        nom: p.nom,
-        prenom: p.prenom,
-        poste: p.poste,
-        entreprise: p.entreprise,
-      },
-      { onConflict: "recruitee_id" }
-    )
+    .upsert(row, { onConflict: "recruitee_id" })
     .select()
     .single();
   if (error) throw error;
