@@ -28,6 +28,16 @@ function splitName(fullName: string): { prenom: string; nom: string } {
   return { prenom: parts[0], nom: parts.slice(1).join(" ") };
 }
 
+async function tryFetch(url: string, apiKey: string) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+  });
+  console.log(`[recruitee/sync] GET ${url} → HTTP ${res.status}`);
+  const text = await res.text();
+  console.log(`[recruitee/sync] response body (first 800 chars):`, text.slice(0, 800));
+  return { ok: res.ok, status: res.status, text };
+}
+
 export async function POST() {
   const companyId = process.env.RECRUITEE_COMPANY_ID;
   const apiKey = process.env.RECRUITEE_API_KEY;
@@ -36,31 +46,64 @@ export async function POST() {
     return NextResponse.json({ error: "Recruitee credentials not configured" }, { status: 500 });
   }
 
-  // Fetch all candidates and filter client-side (Recruitee uses French status names server-side)
-  const url = `${RECRUITEE_BASE}/${companyId}/candidates?per_page=100`;
-  console.log("[recruitee/sync] fetching URL:", url);
+  // Try each endpoint in order; use the first that returns an array of objects
+  const endpointCandidates = [
+    `${RECRUITEE_BASE}/${companyId}/candidates?per_page=100`,
+    `${RECRUITEE_BASE}/${companyId}/placements?per_page=100`,
+    `${RECRUITEE_BASE}/${companyId}/candidates/search?per_page=100`,
+  ];
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-  });
+  let rawText = "";
+  let url = "";
+  let responseStatus = 0;
 
-  console.log("[recruitee/sync] HTTP status:", res.status);
+  for (const endpoint of endpointCandidates) {
+    const result = await tryFetch(endpoint, apiKey);
+    rawText = result.text;
+    url = endpoint;
+    responseStatus = result.status;
 
-  const rawText = await res.text();
-  console.log("[recruitee/sync] response body (first 500 chars):", rawText.slice(0, 500));
+    if (!result.ok) {
+      console.log(`[recruitee/sync] skipping ${endpoint} (non-OK status)`);
+      continue;
+    }
 
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: `Recruitee API error: ${res.status}`, debug: { url, status: res.status, body: rawText.slice(0, 500) } },
-      { status: 502 }
-    );
+    let parsed: unknown;
+    try { parsed = JSON.parse(rawText); } catch { continue; }
+
+    console.log(`[recruitee/sync] top-level keys for ${endpoint}:`, Object.keys(parsed as object));
+
+    // Look for an array-valued key that contains objects (likely candidates/placements)
+    const firstArrayKey = Object.entries(parsed as Record<string, unknown>).find(
+      ([, v]) => Array.isArray(v) && (v as unknown[]).length > 0 && typeof (v as unknown[])[0] === "object"
+    )?.[0];
+
+    if (firstArrayKey) {
+      console.log(`[recruitee/sync] using key "${firstArrayKey}" from ${endpoint}`);
+      const firstItem = (parsed as Record<string, unknown[]>)[firstArrayKey][0];
+      console.log(`[recruitee/sync] first item keys:`, Object.keys(firstItem as object));
+      console.log(`[recruitee/sync] first item (full):`, JSON.stringify(firstItem, null, 2).slice(0, 1500));
+      break;
+    }
+
+    console.log(`[recruitee/sync] no candidate array found in ${endpoint}, trying next`);
   }
 
-  const body = JSON.parse(rawText);
-  const candidates: RecruiteeCandidate[] = body.candidates ?? [];
+  // Re-parse and extract candidates from whichever endpoint worked
+  let body: Record<string, unknown>;
+  try { body = JSON.parse(rawText); } catch {
+    return NextResponse.json({ error: "Failed to parse Recruitee response", debug: { url, responseStatus, rawText: rawText.slice(0, 500) } }, { status: 502 });
+  }
+
+  console.log(`[recruitee/sync] final top-level keys:`, Object.keys(body));
+
+  // Try common array keys in order of likelihood
+  const candidates: RecruiteeCandidate[] =
+    (body.candidates as RecruiteeCandidate[] | undefined) ??
+    (body.placements as RecruiteeCandidate[] | undefined) ??
+    (body.data as RecruiteeCandidate[] | undefined) ??
+    [];
+
   console.log("[recruitee/sync] total candidates from API (before filtering):", candidates.length);
 
   const HIRED_STAGES = new Set(["hired", "Hired", "engagé", "Engagé", "engage", "Engage", "embauché", "Embauché"]);
@@ -112,8 +155,9 @@ export async function POST() {
     detectedStages: allStages,
     debug: {
       url,
-      httpStatus: res.status,
+      httpStatus: responseStatus,
       responsePreview: rawText.slice(0, 500),
+      topLevelKeys: Object.keys(body),
       totalCandidatesBeforeFilter: candidates.length,
     },
   });
