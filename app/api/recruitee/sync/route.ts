@@ -136,14 +136,21 @@ export async function POST() {
   const enriched = await Promise.all(
     candidates.map(async (candidate) => {
       const placement = getHiredPlacement(candidate.placements ?? []);
-      if (!placement) return null;
-      const offerBody = await apiFetch(
-        `${RECRUITEE_BASE}/${companyId}/offers/${placement.offer_id}`,
-        apiKey
-      ).catch((e) => {
-        console.error(`[recruitee/sync] offer ${placement.offer_id} error:`, e);
-        return null;
-      });
+
+      let offerBody: unknown = null;
+      if (placement?.offer_id != null) {
+        try {
+          offerBody = await apiFetch(
+            `${RECRUITEE_BASE}/${companyId}/offers/${placement.offer_id}`,
+            apiKey
+          );
+        } catch (e) {
+          console.error(`[recruitee/sync] offer ${placement.offer_id} fetch failed:`, e);
+        }
+      } else {
+        console.log(`[recruitee/sync] candidate ${candidate.id} — no offer_id, skipping offer fetch`);
+      }
+
       return { candidate, placement, offerBody };
     })
   );
@@ -152,7 +159,6 @@ export async function POST() {
   const errors: string[] = [];
 
   for (const item of enriched) {
-    if (!item) continue;
     const { candidate, placement, offerBody } = item;
     try {
       const rawOffer = offerBody as Record<string, unknown> | null;
@@ -169,7 +175,7 @@ export async function POST() {
         prenom,
         poste,
         entreprise,
-        startDate: placement.hired_at ?? placement.job_starts_at ?? null,
+        startDate: placement?.hired_at ?? placement?.job_starts_at ?? null,
       });
       synced++;
     } catch (err) {
