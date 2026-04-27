@@ -157,6 +157,7 @@ export async function POST() {
       });
       synced++;
     } catch (err) {
+      console.error(`[recruitee/sync] supabase insert error: candidate ${candidate.id}:`, err);
       errors.push(`Candidate ${candidate.id}: ${String(err)}`);
     }
   }

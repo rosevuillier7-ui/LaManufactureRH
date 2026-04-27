@@ -659,14 +659,15 @@ export async function upsertObjective(obj: CoachingObjective): Promise<void> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function fromDbPlacement(row: any): Placement {
+  const nameParts = (row.candidate_name ?? "").trim().split(/\s+/);
   return {
     id: str(row.id),
-    recruiteeId: str(row.recruitee_id),
-    nom: str(row.nom),
-    prenom: str(row.prenom),
-    poste: str(row.poste),
-    entreprise: str(row.entreprise),
-    datePriseDePoste: nullable(row.date_prise_de_poste),
+    recruiteeId: str(row.recruitee_candidate_id),
+    nom: nameParts.slice(1).join(" "),
+    prenom: nameParts[0] ?? "",
+    poste: str(row.job_title),
+    entreprise: str(row.company),
+    datePriseDePoste: nullable(row.start_date),
     calEventJMinus1Id: nullable(row.cal_event_j_minus_1_id),
     calEventJId: nullable(row.cal_event_j_id),
     calEventJPlus15Id: nullable(row.cal_event_j_plus_15_id),
@@ -694,19 +695,23 @@ export async function upsertPlacement(p: {
   startDate?: string | null;
 }): Promise<Placement> {
   const row: Record<string, unknown> = {
-    recruitee_id: p.recruiteeId,
-    nom: p.nom,
-    prenom: p.prenom,
-    poste: p.poste,
-    entreprise: p.entreprise,
+    recruitee_candidate_id: p.recruiteeId,
+    candidate_name: [p.prenom, p.nom].filter(Boolean).join(" "),
+    job_title: p.poste,
+    company: p.entreprise,
   };
-  if (p.startDate) row.date_prise_de_poste = p.startDate;
+  if (p.startDate) row.start_date = p.startDate;
+  console.log(`[recruitee/sync] supabase insert payload:`, JSON.stringify(row));
   const { data, error } = await supabase
     .from("placements")
-    .upsert(row, { onConflict: "recruitee_id" })
+    .upsert(row, { onConflict: "recruitee_candidate_id" })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error(`[recruitee/sync] supabase insert error:`, error.message, `| code: ${error.code} | details: ${error.details} | hint: ${error.hint}`);
+    throw error;
+  }
+  console.log(`[recruitee/sync] supabase insert success, row id: ${data?.id}`);
   return fromDbPlacement(data);
 }
 
