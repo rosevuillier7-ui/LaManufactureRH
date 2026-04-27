@@ -36,8 +36,8 @@ export async function POST() {
     return NextResponse.json({ error: "Recruitee credentials not configured" }, { status: 500 });
   }
 
-  // Fetch candidates with hired status
-  const url = `${RECRUITEE_BASE}/${companyId}/candidates?status[]=hired&per_page=100`;
+  // Fetch all candidates and filter client-side (Recruitee uses French status names server-side)
+  const url = `${RECRUITEE_BASE}/${companyId}/candidates?per_page=100`;
   console.log("[recruitee/sync] fetching URL:", url);
 
   const res = await fetch(url, {
