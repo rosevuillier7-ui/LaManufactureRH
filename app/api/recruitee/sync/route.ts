@@ -37,25 +37,31 @@ export async function POST() {
   }
 
   // Fetch candidates with hired status
-  const res = await fetch(
-    `${RECRUITEE_BASE}/${companyId}/candidates?status[]=hired&per_page=100`,
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const url = `${RECRUITEE_BASE}/${companyId}/candidates?status[]=hired&per_page=100`;
+  console.log("[recruitee/sync] fetching URL:", url);
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  console.log("[recruitee/sync] HTTP status:", res.status);
+
+  const rawText = await res.text();
+  console.log("[recruitee/sync] response body (first 500 chars):", rawText.slice(0, 500));
 
   if (!res.ok) {
     return NextResponse.json(
-      { error: `Recruitee API error: ${res.status}` },
+      { error: `Recruitee API error: ${res.status}`, debug: { url, status: res.status, body: rawText.slice(0, 500) } },
       { status: 502 }
     );
   }
 
-  const body = await res.json();
+  const body = JSON.parse(rawText);
   const candidates: RecruiteeCandidate[] = body.candidates ?? [];
+  console.log("[recruitee/sync] total candidates from API (before filtering):", candidates.length);
 
   const HIRED_STAGES = new Set(["hired", "Hired", "engagé", "Engagé", "engage", "Engage", "embauché", "Embauché"]);
 
@@ -99,5 +105,16 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({ synced, total: hiredCandidates.length, errors, detectedStages: allStages });
+  return NextResponse.json({
+    synced,
+    total: hiredCandidates.length,
+    errors,
+    detectedStages: allStages,
+    debug: {
+      url,
+      httpStatus: res.status,
+      responsePreview: rawText.slice(0, 500),
+      totalCandidatesBeforeFilter: candidates.length,
+    },
+  });
 }
