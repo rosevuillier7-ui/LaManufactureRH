@@ -118,7 +118,7 @@ export async function POST(
   const jPlus15 = addDays(datePriseDePoste, 15);
   const jPlus46 = addDays(datePriseDePoste, 46);
   const jPlus76 = addDays(datePriseDePoste, 76);
-  const prenom = placement.prenom as string;
+  const firstName = ((placement.candidate_name as string) || "").trim().split(/\s+/)[0] || "le candidat";
 
   // Helper to retry with refreshed token on 401
   async function safeCreate(
@@ -143,27 +143,27 @@ export async function POST(
   // Create 5 calendar events sequentially to avoid rate limits
   const [idJMinus1, idJ, idJPlus15, idJPlus46, idJPlus76] = await Promise.all([
     safeCreate(
-      `Envoyer SMS de bonne prise de poste à ${prenom}`,
+      `Envoyer SMS de bonne prise de poste à ${firstName}`,
       { dateTime: `${jMinus1}T09:00:00`, timeZone: TZ },
       { dateTime: `${jMinus1}T09:30:00`, timeZone: TZ }
     ),
     safeCreate(
-      `Envoyer SMS à ${prenom} pour savoir comment s'est passé le 1er jour`,
+      `Envoyer SMS à ${firstName} pour savoir comment s'est passé le 1er jour`,
       { dateTime: `${datePriseDePoste}T18:00:00`, timeZone: TZ },
       { dateTime: `${datePriseDePoste}T18:30:00`, timeZone: TZ }
     ),
     safeCreate(
-      `Call de suivi avec ${prenom}`,
+      `Call de suivi avec ${firstName}`,
       { dateTime: `${jPlus15}T10:00:00`, timeZone: TZ },
       { dateTime: `${jPlus15}T10:30:00`, timeZone: TZ }
     ),
     safeCreate(
-      `Call de suivi avec ${prenom}`,
+      `Call de suivi avec ${firstName}`,
       { dateTime: `${jPlus46}T10:00:00`, timeZone: TZ },
       { dateTime: `${jPlus46}T10:30:00`, timeZone: TZ }
     ),
     safeCreate(
-      `Call de suivi avec ${prenom}`,
+      `Call de suivi avec ${firstName}`,
       { dateTime: `${jPlus76}T10:00:00`, timeZone: TZ },
       { dateTime: `${jPlus76}T10:30:00`, timeZone: TZ }
     ),
