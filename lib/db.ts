@@ -700,7 +700,6 @@ export async function upsertPlacement(p: {
     job_title: p.poste,
     company: p.entreprise,
   };
-  if (p.startDate) row.start_date = p.startDate;
   console.log(`[recruitee/sync] supabase insert payload:`, JSON.stringify(row));
   const { data, error } = await supabase
     .from("placements")
@@ -712,7 +711,11 @@ export async function upsertPlacement(p: {
     throw error;
   }
   console.log(`[recruitee/sync] supabase insert success, row id: ${data?.id}`);
-  return fromDbPlacement(data);
+  // Set hired_at as the initial default date only if no custom date has been saved yet
+  if (p.startDate && data && !data.start_date) {
+    await supabase.from("placements").update({ start_date: p.startDate }).eq("id", data.id);
+  }
+  return fromDbPlacement({ ...data, start_date: data.start_date ?? (p.startDate && !data.start_date ? p.startDate : null) });
 }
 
 export async function updatePlacementStartDate(
@@ -736,6 +739,14 @@ export async function updatePlacementStartDate(
       cal_event_j_plus_46_id: eventIds.calEventJPlus46Id,
       cal_event_j_plus_76_id: eventIds.calEventJPlus76Id,
     })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updatePlacementDate(id: string, date: string): Promise<void> {
+  const { error } = await supabase
+    .from("placements")
+    .update({ start_date: date })
     .eq("id", id);
   if (error) throw error;
 }

@@ -16,7 +16,8 @@
       "Bash(git push:*)",
       "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")",
       "Bash(git -C /Users/rosevuillier/Documents/Github/LaManufactureRH log --oneline --all)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Skill(investigate)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { updatePlacementStartDate } from "@/lib/db";
+import { updatePlacementStartDate, updatePlacementDate } from "@/lib/db";
 
 const GCAL_BASE = "https://www.googleapis.com/calendar/v3/calendars/primary";
 const TZ = "Europe/Paris";
@@ -83,6 +83,9 @@ export async function POST(
   if (fetchError || !placement) {
     return NextResponse.json({ error: "Placement introuvable" }, { status: 404 });
   }
+
+  // Persist the new date immediately so it survives even if GCal creation fails
+  await updatePlacementDate(id, datePriseDePoste);
 
   // Resolve Google Calendar token
   const accessCookie = request.cookies.get("gcal_access_token")?.value;
@@ -190,4 +193,25 @@ export async function POST(
   }
 
   return response;
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+  const { datePriseDePoste } = body as { datePriseDePoste: string };
+
+  if (!datePriseDePoste || !/^\d{4}-\d{2}-\d{2}$/.test(datePriseDePoste)) {
+    return NextResponse.json({ error: "Date invalide (format YYYY-MM-DD requis)" }, { status: 400 });
+  }
+
+  try {
+    await updatePlacementDate(id, datePriseDePoste);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[placements/start-date] PATCH error:", err);
+    return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
+  }
 }

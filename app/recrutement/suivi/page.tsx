@@ -137,6 +137,16 @@ function PlacementCard({
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            onBlur={(e) => {
+              const val = e.target.value;
+              if (val && val !== (placement.datePriseDePoste ?? "")) {
+                fetch(`/api/placements/${placement.id}/start-date`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ datePriseDePoste: val }),
+                }).catch(() => {});
+              }
+            }}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
         </div>
