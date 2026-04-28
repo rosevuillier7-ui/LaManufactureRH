@@ -729,7 +729,7 @@ export async function updatePlacementStartDate(
   const { error } = await supabase
     .from("placements")
     .update({
-      date_prise_de_poste: datePriseDePoste,
+      start_date: datePriseDePoste,
       cal_event_j_minus_1_id: eventIds.calEventJMinus1Id,
       cal_event_j_id: eventIds.calEventJId,
       cal_event_j_plus_15_id: eventIds.calEventJPlus15Id,
