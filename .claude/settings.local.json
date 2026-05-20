@@ -17,7 +17,12 @@
       "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")",
       "Bash(git -C /Users/rosevuillier/Documents/Github/LaManufactureRH log --oneline --all)",
       "Bash(git:*)",
-      "Skill(investigate)"
+      "Skill(investigate)",
+      "WebSearch",
+      "WebFetch(domain:docs.recruitee.com)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(npx eslint *)",
+      "Skill(ship)"
     ]
   }
 }
