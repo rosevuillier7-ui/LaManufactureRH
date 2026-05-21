@@ -50,6 +50,12 @@ const STEPS: TimelineStep[] = [
   { key: "calEventJPlus76Id", label: "Call J+76", offset: 76, time: "10:00", icon: "📞" },
 ];
 
+// Recruitment source options. Everything except "Autre" is stored verbatim in
+// the `source` column; "Autre" is a UI-only sentinel that reveals a free text
+// input whose typed value is stored instead.
+const SOURCE_OPTIONS = ["LinkedIn", "Indeed", "Cadremploi", "Apec", "Chasse", "Profilr", "Autre"];
+const PREDEFINED_SOURCES = SOURCE_OPTIONS.filter((o) => o !== "Autre");
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function addDays(dateStr: string, days: number): Date {
@@ -88,6 +94,23 @@ function PlacementCard({
   const [date, setDate] = useState(placement.datePriseDePoste ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Derive the dropdown + custom-text state from the stored source.
+  const storedSource = placement.source ?? "";
+  const [sourceSelect, setSourceSelect] = useState(
+    storedSource === "" ? "" : PREDEFINED_SOURCES.includes(storedSource) ? storedSource : "Autre"
+  );
+  const [sourceCustom, setSourceCustom] = useState(
+    storedSource !== "" && !PREDEFINED_SOURCES.includes(storedSource) ? storedSource : ""
+  );
+
+  function saveSource(value: string) {
+    fetch(`/api/placements/${placement.id}/source`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: value }),
+    }).catch(() => {});
+  }
 
   const hasEvents = !!placement.calEventJMinus1Id;
   const dateChanged = date !== (placement.datePriseDePoste ?? "");
@@ -146,6 +169,46 @@ function PlacementCard({
             <CheckCircleIcon className="w-3.5 h-3.5" />
             Agenda créé
           </span>
+        )}
+      </div>
+
+      {/* Source */}
+      <div className="mb-5">
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+          Source
+        </label>
+        <select
+          value={sourceSelect}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSourceSelect(val);
+            if (val === "Autre") return; // wait for the text input blur to persist
+            setSourceCustom("");
+            saveSource(val);
+          }}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+        >
+          <option value="" disabled>
+            Sélectionner une source
+          </option>
+          {SOURCE_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+        {sourceSelect === "Autre" && (
+          <input
+            type="text"
+            value={sourceCustom}
+            onChange={(e) => setSourceCustom(e.target.value)}
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              if (val !== (placement.source ?? "")) saveSource(val);
+            }}
+            placeholder="Préciser la source"
+            className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
         )}
       </div>
 

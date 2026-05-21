@@ -166,6 +166,7 @@ export interface Placement {
   prenom: string;
   poste: string;
   entreprise: string;
+  source?: string; // free text — predefined option label or a custom value
   datePriseDePoste?: string; // YYYY-MM-DD
   calEventJMinus1Id?: string;
   calEventJId?: string;
