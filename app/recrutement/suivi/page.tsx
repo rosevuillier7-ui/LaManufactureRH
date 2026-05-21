@@ -13,6 +13,20 @@ import { Placement } from "@/lib/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type AccountKey = "flaubert" | "claire";
+
+interface AccountStatus {
+  key: AccountKey;
+  connected: boolean;
+  email: string | null;
+}
+
+const ACCOUNT_KEYS: AccountKey[] = ["flaubert", "claire"];
+const ACCOUNT_LABELS: Record<AccountKey, string> = {
+  flaubert: "Flaubert",
+  claire: "Claire",
+};
+
 interface TimelineStep {
   key: keyof Pick<
     Placement,
@@ -62,11 +76,13 @@ function isPast(d: Date): boolean {
 
 function PlacementCard({
   placement,
-  gcalConnected,
+  selectedAccount,
+  accountConnected,
   onUpdated,
 }: {
   placement: Placement;
-  gcalConnected: boolean;
+  selectedAccount: AccountKey;
+  accountConnected: boolean;
   onUpdated: () => void;
 }) {
   const [date, setDate] = useState(placement.datePriseDePoste ?? "");
@@ -84,11 +100,17 @@ function PlacementCard({
       const res = await fetch(`/api/placements/${placement.id}/start-date`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datePriseDePoste: date }),
+        body: JSON.stringify({ datePriseDePoste: date, account_key: selectedAccount }),
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error ?? "Erreur inconnue");
+        if (data.reconnect) {
+          setError(
+            `Compte ${ACCOUNT_LABELS[selectedAccount]} à reconnecter (voir « Comptes Google » ci-dessus).`
+          );
+        } else {
+          setError(data.error ?? "Erreur inconnue");
+        }
       } else {
         onUpdated();
       }
@@ -153,8 +175,12 @@ function PlacementCard({
         {date && (dateChanged || !hasEvents) && (
           <button
             onClick={handleSave}
-            disabled={saving || !gcalConnected}
-            title={!gcalConnected ? "Connectez Google Agenda d'abord" : undefined}
+            disabled={saving || !accountConnected}
+            title={
+              !accountConnected
+                ? `Connectez le compte ${ACCOUNT_LABELS[selectedAccount]} d'abord`
+                : undefined
+            }
             className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (
@@ -227,6 +253,52 @@ function PlacementCard({
   );
 }
 
+// ─── Comptes Google ─────────────────────────────────────────────────────────
+
+function GoogleAccounts({ accounts }: { accounts: AccountStatus[] }) {
+  return (
+    <div className="mb-6 px-5 py-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+      <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
+        Comptes Google
+      </p>
+      <div className="space-y-2.5">
+        {ACCOUNT_KEYS.map((key) => {
+          const acc = accounts.find((a) => a.key === key);
+          const connected = !!acc?.connected;
+          return (
+            <div key={key} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {connected ? (
+                  <CheckCircleSolid className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                ) : (
+                  <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 leading-tight">
+                    {ACCOUNT_LABELS[key]}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {connected ? acc?.email ?? "Connecté" : "Non connecté"}
+                  </p>
+                </div>
+              </div>
+              {/* Always visible — even when a (possibly expired) token row exists. */}
+              <a
+                href={`/api/gcal/auth/login?account=${key}&from=/recrutement/suivi`}
+                className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <ArrowPathIcon className="w-3.5 h-3.5" />
+                {connected ? "Reconnecter" : "Connecter"}
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SuiviPage() {
@@ -235,13 +307,17 @@ export default function SuiviPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; total: number } | null>(null);
   const [syncError, setSyncError] = useState("");
-  const [gcalConnected, setGcalConnected] = useState(false);
+  const [accounts, setAccounts] = useState<AccountStatus[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<AccountKey>("flaubert");
 
   // Read banner from URL params
   const [banner, setBanner] = useState<"connected" | "error" | null>(null);
+  const [bannerAccount, setBannerAccount] = useState<AccountKey | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const acc = params.get("account");
+    if (acc === "flaubert" || acc === "claire") setBannerAccount(acc);
     if (params.get("gcal_connected")) setBanner("connected");
     if (params.get("gcal_error")) setBanner("error");
     // Clean URL
@@ -264,7 +340,7 @@ export default function SuiviPage() {
   const checkGcal = useCallback(async () => {
     const res = await fetch("/api/gcal/status");
     const data = await res.json();
-    setGcalConnected(data.connected);
+    setAccounts(data.accounts ?? []);
   }, []);
 
   useEffect(() => {
@@ -292,6 +368,8 @@ export default function SuiviPage() {
     }
   }
 
+  const selectedConnected = !!accounts.find((a) => a.key === selectedAccount)?.connected;
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -306,37 +384,22 @@ export default function SuiviPage() {
       {banner === "connected" && (
         <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-800 rounded-xl text-sm border border-emerald-100">
           <CheckCircleIcon className="w-5 h-5 flex-shrink-0" />
-          Google Agenda connecté avec succès.
+          Compte Google {bannerAccount ? ACCOUNT_LABELS[bannerAccount] : ""} connecté avec succès.
         </div>
       )}
       {banner === "error" && (
         <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 text-red-800 rounded-xl text-sm border border-red-100">
           <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
-          Erreur lors de la connexion à Google Agenda. Réessayez.
+          Erreur lors de la connexion à Google Agenda
+          {bannerAccount ? ` (${ACCOUNT_LABELS[bannerAccount]})` : ""}. Réessayez.
         </div>
       )}
 
-      {/* Google Calendar connection */}
-      {!gcalConnected && (
-        <div className="mb-6 flex items-center justify-between gap-4 px-5 py-4 bg-amber-50 border border-amber-100 rounded-xl">
-          <div>
-            <p className="text-sm font-medium text-amber-900">Google Agenda non connecté</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Connectez votre compte Google pour créer automatiquement les événements de suivi.
-            </p>
-          </div>
-          <a
-            href="/api/gcal/auth/login"
-            className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
-          >
-            <CalendarDaysIcon className="w-4 h-4" />
-            Connecter Google Agenda
-          </a>
-        </div>
-      )}
+      {/* Google accounts connection status */}
+      <GoogleAccounts accounts={accounts} />
 
       {/* Actions */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
           onClick={handleSync}
           disabled={syncing}
@@ -345,6 +408,25 @@ export default function SuiviPage() {
           <ArrowPathIcon className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Synchronisation…" : "Synchroniser Recruitee"}
         </button>
+
+        {/* Account picker for "Créer les événements" */}
+        <div className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <label htmlFor="gcal-account" className="text-sm text-gray-500">
+            Créer dans l&apos;agenda de
+          </label>
+          <select
+            id="gcal-account"
+            value={selectedAccount}
+            onChange={(e) => setSelectedAccount(e.target.value as AccountKey)}
+            className="text-sm font-medium text-gray-800 bg-transparent focus:outline-none cursor-pointer"
+          >
+            {ACCOUNT_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {ACCOUNT_LABELS[key]}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {syncResult && (
           <span className="text-sm text-emerald-700">
@@ -390,7 +472,8 @@ export default function SuiviPage() {
             <PlacementCard
               key={p.id}
               placement={p}
-              gcalConnected={gcalConnected}
+              selectedAccount={selectedAccount}
+              accountConnected={selectedConnected}
               onUpdated={loadPlacements}
             />
           ))}

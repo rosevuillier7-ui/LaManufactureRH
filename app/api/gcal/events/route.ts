@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getValidAccessToken, parseAccountKey, GcalReconnectError } from "@/lib/gcal";
 
 const PODCAST_KEYWORDS = ["podcast", "épisode", "episode", "13ème mois", "13eme mois"];
 
@@ -7,38 +8,17 @@ function matchesPodcast(title: string): boolean {
   return PODCAST_KEYWORDS.some((k) => lower.includes(k));
 }
 
-async function refreshGcalToken(refreshToken: string): Promise<string | null> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.access_token ?? null;
-}
-
 export async function GET(request: NextRequest) {
-  let accessToken = request.cookies.get("gcal_access_token")?.value;
-  const refreshToken = request.cookies.get("gcal_refresh_token")?.value;
+  const account = parseAccountKey(request.nextUrl.searchParams.get("account"));
 
-  let newAccessToken: string | null = null;
-
-  if (!accessToken && refreshToken) {
-    const refreshed = await refreshGcalToken(refreshToken);
-    if (refreshed) {
-      accessToken = refreshed;
-      newAccessToken = refreshed;
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(account);
+  } catch (err) {
+    if (err instanceof GcalReconnectError) {
+      return NextResponse.json({ connected: false, events: [], reconnect: true, account });
     }
-  }
-
-  if (!accessToken) {
-    return NextResponse.json({ connected: false, events: [] });
+    throw err;
   }
 
   const now = new Date().toISOString();
@@ -56,45 +36,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ connected: false, events: [] });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await res.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const events = (data.items ?? []).filter((e: any) => matchesPodcast(e.summary ?? ""));
 
-  const response = NextResponse.json({ connected: true, events });
-
-  if (newAccessToken) {
-    response.cookies.set("gcal_access_token", newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 3600,
-    });
-  }
-
-  return response;
+  return NextResponse.json({ connected: true, events });
 }
 
 export async function POST(request: NextRequest) {
-  let accessToken = request.cookies.get("gcal_access_token")?.value;
-  const refreshToken = request.cookies.get("gcal_refresh_token")?.value;
-
-  let newAccessToken: string | null = null;
-
-  if (!accessToken && refreshToken) {
-    const refreshed = await refreshGcalToken(refreshToken);
-    if (refreshed) {
-      accessToken = refreshed;
-      newAccessToken = refreshed;
-    }
-  }
-
-  if (!accessToken) {
-    return NextResponse.json({ error: "Not connected" }, { status: 401 });
-  }
-
   const body = await request.json();
+  const account = parseAccountKey(body.account_key ?? body.account);
+
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(account);
+  } catch (err) {
+    if (err instanceof GcalReconnectError) {
+      return NextResponse.json(
+        { error: "Compte Google à reconnecter", reconnect: true, account },
+        { status: 401 }
+      );
+    }
+    throw err;
+  }
+
   const { title, date, time, endTime, location, description } = body;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,17 +93,5 @@ export async function POST(request: NextRequest) {
   }
 
   const created = await res.json();
-  const response = NextResponse.json(created);
-
-  if (newAccessToken) {
-    response.cookies.set("gcal_access_token", newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 3600,
-    });
-  }
-
-  return response;
+  return NextResponse.json(created);
 }

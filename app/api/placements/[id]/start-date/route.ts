@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { updatePlacementStartDate, updatePlacementDate } from "@/lib/db";
+import { getValidAccessToken, parseAccountKey, GcalReconnectError } from "@/lib/gcal";
 
 const GCAL_BASE = "https://www.googleapis.com/calendar/v3/calendars/primary";
 const TZ = "Europe/Paris";
-
-async function refreshGcalToken(refreshToken: string): Promise<string | null> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.access_token ?? null;
-}
 
 async function createEvent(
   token: string,
@@ -68,6 +53,7 @@ export async function POST(
   const { id } = await params;
   const body = await request.json();
   const { datePriseDePoste } = body as { datePriseDePoste: string };
+  const account = parseAccountKey(body.account_key ?? body.account);
 
   if (!datePriseDePoste || !/^\d{4}-\d{2}-\d{2}$/.test(datePriseDePoste)) {
     return NextResponse.json({ error: "Date invalide (format YYYY-MM-DD requis)" }, { status: 400 });
@@ -87,22 +73,18 @@ export async function POST(
   // Persist the new date immediately so it survives even if GCal creation fails
   await updatePlacementDate(id, datePriseDePoste);
 
-  // Resolve Google Calendar token
-  const accessCookie = request.cookies.get("gcal_access_token")?.value;
-  const refreshCookie = request.cookies.get("gcal_refresh_token")?.value;
-
-  if (!accessCookie && !refreshCookie) {
-    return NextResponse.json({ error: "Google Agenda non connecté" }, { status: 401 });
-  }
-
-  let token = accessCookie;
-  let freshToken: string | undefined;
-
-  if (!token) {
-    const newToken = await refreshGcalToken(refreshCookie!);
-    if (!newToken) return NextResponse.json({ error: "Session Google expirée, reconnectez-vous" }, { status: 401 });
-    token = newToken;
-    freshToken = newToken;
+  // Resolve the selected account's Google Calendar token (refreshes if expired).
+  let token: string;
+  try {
+    token = await getValidAccessToken(account);
+  } catch (err) {
+    if (err instanceof GcalReconnectError) {
+      return NextResponse.json(
+        { error: "Session Google expirée, reconnectez le compte sélectionné", reconnect: true, account },
+        { status: 401 }
+      );
+    }
+    throw err;
   }
 
   // Delete old events if they exist
@@ -114,7 +96,7 @@ export async function POST(
     placement.cal_event_j_plus_76_id,
   ].filter(Boolean);
 
-  await Promise.allSettled(oldEventIds.map((eid) => deleteEvent(token!, eid)));
+  await Promise.allSettled(oldEventIds.map((eid) => deleteEvent(token, eid)));
 
   // Compute event dates
   const jMinus1 = addDays(datePriseDePoste, -1);
@@ -123,20 +105,18 @@ export async function POST(
   const jPlus76 = addDays(datePriseDePoste, 76);
   const firstName = ((placement.candidate_name as string) || "").trim().split(/\s+/)[0] || "le candidat";
 
-  // Helper to retry with refreshed token on 401
+  // Helper to retry with a refreshed token on 401 (token mid-flight expiry).
   async function safeCreate(
     summary: string,
     start: { dateTime?: string; date?: string; timeZone?: string },
     end: { dateTime?: string; date?: string; timeZone?: string }
   ): Promise<string> {
     try {
-      return await createEvent(token!, summary, start, end);
+      return await createEvent(token, summary, start, end);
     } catch (err) {
-      if (String(err).includes("401") && refreshCookie) {
-        const newToken = await refreshGcalToken(refreshCookie);
-        if (!newToken) throw err;
-        token = newToken;
-        freshToken = newToken;
+      if (String(err).includes("401")) {
+        // Force a fresh token from the table and retry once.
+        token = await getValidAccessToken(account);
         return await createEvent(token, summary, start, end);
       }
       throw err;
@@ -180,19 +160,7 @@ export async function POST(
     calEventJPlus76Id: idJPlus76,
   });
 
-  const response = NextResponse.json({ ok: true });
-
-  if (freshToken) {
-    response.cookies.set("gcal_access_token", freshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 3600,
-    });
-  }
-
-  return response;
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(

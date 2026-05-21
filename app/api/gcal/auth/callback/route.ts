@@ -1,55 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  parseAccountKey,
+  exchangeCodeForTokens,
+  fetchAccountEmail,
+  saveTokens,
+  type AccountKey,
+} from "@/lib/gcal";
+
+function decodeState(raw: string | null): { from: string; account: AccountKey } {
+  if (!raw) return { from: "/recrutement/suivi", account: parseAccountKey(null) };
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw));
+    return {
+      from: typeof parsed.from === "string" ? parsed.from : "/recrutement/suivi",
+      account: parseAccountKey(parsed.account),
+    };
+  } catch {
+    // Backward-compat: older state was just the `from` path, plain-encoded.
+    return { from: decodeURIComponent(raw), account: parseAccountKey(null) };
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
+  const { from, account } = decodeState(searchParams.get("state"));
 
-  const rawState = searchParams.get("state");
-  const from = rawState ? decodeURIComponent(rawState) : "/recrutement/suivi";
+  const errorUrl = (acc: AccountKey) =>
+    new URL(`${from}?gcal_error=1&account=${acc}`, origin);
 
   if (!code || searchParams.get("error")) {
-    return NextResponse.redirect(new URL(`${from}?gcal_error=1`, origin));
+    return NextResponse.redirect(errorUrl(account));
   }
 
   const redirectUri = `${origin}/api/gcal/auth/callback`;
+  const tokens = await exchangeCodeForTokens(code, redirectUri);
 
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    return NextResponse.redirect(new URL("/recrutement/suivi?gcal_error=1", origin));
+  if (!tokens || !tokens.access_token) {
+    return NextResponse.redirect(errorUrl(account));
   }
 
-  const tokens = await tokenRes.json();
-  const response = NextResponse.redirect(new URL("/recrutement/suivi?gcal_connected=1", origin));
+  // Read the connected account's email from its primary calendar id.
+  const email = await fetchAccountEmail(tokens.access_token);
 
-  const cookieBase = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-  };
-
-  response.cookies.set("gcal_access_token", tokens.access_token, {
-    ...cookieBase,
-    maxAge: tokens.expires_in ?? 3600,
-  });
-
-  if (tokens.refresh_token) {
-    response.cookies.set("gcal_refresh_token", tokens.refresh_token, {
-      ...cookieBase,
-      maxAge: 60 * 60 * 24 * 365,
+  try {
+    await saveTokens(account, {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_in: tokens.expires_in,
+      email,
     });
+  } catch {
+    return NextResponse.redirect(errorUrl(account));
   }
 
-  return response;
+  return NextResponse.redirect(
+    new URL(`${from}?gcal_connected=1&account=${account}`, origin)
+  );
 }
