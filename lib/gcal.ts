@@ -12,7 +12,7 @@
 // `access_type=offline` + `prompt=consent` in the login route are what
 // guarantee a refresh token is issued in the first place — keep them.
 
-import { supabaseAdmin } from "./supabaseAdmin";
+import { getSupabaseAdmin } from "./supabaseAdmin";
 
 export type AccountKey = "flaubert" | "claire";
 
@@ -101,7 +101,7 @@ export async function saveTokens(
   }
   if (tokens.email !== undefined) row.email = tokens.email;
 
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from("google_accounts")
     .upsert(row, { onConflict: "account_key" });
   if (error) throw error;
@@ -111,7 +111,7 @@ export async function saveTokens(
  *  Throws GcalReconnectError when there is no refresh token or the refresh is
  *  rejected by Google. */
 export async function getValidAccessToken(account: AccountKey): Promise<string> {
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error } = await getSupabaseAdmin()
     .from("google_accounts")
     .select("access_token, refresh_token, expires_at")
     .eq("account_key", account)
@@ -164,7 +164,7 @@ export interface AccountStatus {
 /** Connection status for every account, for the "Comptes Google" UI.
  *  `connected` means a refresh token is stored (the durable credential). */
 export async function getAccountsStatus(): Promise<AccountStatus[]> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("google_accounts")
     .select("account_key, refresh_token, email");
   if (error) throw error;

@@ -2,7 +2,6 @@
 // All functions throw on error — callers should handle as needed.
 
 import { supabase } from "./supabase";
-import { supabaseAdmin } from "./supabaseAdmin";
 import type {
   Prospect, ProspectStatus, ProspectAction, ActionType, TypeService,
   Client, ClientStatus,
@@ -749,17 +748,6 @@ export async function updatePlacementDate(id: string, date: string): Promise<voi
   const { error } = await supabase
     .from("placements")
     .update({ start_date: date })
-    .eq("id", id);
-  if (error) throw error;
-}
-
-// Persist the recruitment source. Written via the service-role client so the
-// update is never blocked by RLS. An empty/blank value clears the column.
-export async function updatePlacementSource(id: string, source: string): Promise<void> {
-  const trimmed = source.trim();
-  const { error } = await supabaseAdmin
-    .from("placements")
-    .update({ source: trimmed || null })
     .eq("id", id);
   if (error) throw error;
 }

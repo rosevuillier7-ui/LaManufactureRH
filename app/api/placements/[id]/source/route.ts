@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updatePlacementSource } from "@/lib/db";
+import { updatePlacementSource } from "@/lib/dbAdmin";
 
 export async function PATCH(
   request: NextRequest,
