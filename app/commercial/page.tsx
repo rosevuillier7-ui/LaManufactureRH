@@ -130,14 +130,14 @@ export default function CommercialOverviewPage() {
   const hasUrgences = overdueProspects.length > 0 || impayes.length > 0;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Commercial</h1>
         <p className="text-gray-500 mt-1">Vue d&apos;ensemble de votre activité commerciale</p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -183,9 +183,9 @@ export default function CommercialOverviewPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Pipeline bar chart */}
-        <div className="col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-5">Pipeline prospects</h2>
           <div className="space-y-3">
             {pipelineCounts.map(({ status, count }) => (
@@ -241,7 +241,7 @@ export default function CommercialOverviewPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Prochaines actions */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
