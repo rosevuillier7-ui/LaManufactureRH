@@ -116,7 +116,9 @@ export default function CommercialOverviewPage() {
   }));
   const maxCount = Math.max(...pipelineCounts.map(p => p.count), 1);
 
-  const overdueProspects = activeProspects.filter(p => daysSince(p.dernierContact) > 14);
+  const overdueProspects = activeProspects
+    .filter(p => daysSince(p.dernierContact) > 14)
+    .sort((a, b) => daysSince(b.dernierContact) - daysSince(a.dernierContact));
 
   const todos = prospects
     .filter(p => p.todo?.trim())
@@ -209,34 +211,58 @@ export default function CommercialOverviewPage() {
         </div>
 
         {/* Urgences */}
-        <div className={`rounded-2xl border shadow-sm p-6 ${hasUrgences ? "bg-red-50 border-red-100" : "bg-white border-gray-100"}`}>
-          <div className="flex items-center gap-2 mb-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="flex items-center gap-2">
             <ExclamationTriangleIcon className={`w-4 h-4 ${hasUrgences ? "text-red-500" : "text-gray-400"}`} />
             <h2 className="text-sm font-semibold text-gray-700">Urgences</h2>
+            {hasUrgences && (
+              <span className="ml-auto rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                {overdueProspects.length + impayes.length}
+              </span>
+            )}
           </div>
           {!hasUrgences ? (
-            <p className="text-xs text-gray-400 italic">Aucune urgence — tout est à jour</p>
+            <p className="mt-4 text-xs text-gray-400">Aucune urgence — tout est à jour</p>
           ) : (
-            <div className="space-y-2">
-              {overdueProspects.map(p => (
-                <Link key={p.id} href="/commercial/prospects" className="block">
-                  <div className="bg-white rounded-xl p-3 border border-red-100 hover:border-red-200 transition-colors">
-                    <p className="text-xs font-semibold text-gray-800">{p.entreprise}</p>
-                    <p className="text-xs text-red-600 mt-0.5">
-                      Pas de contact depuis {daysSince(p.dernierContact)} jours
-                    </p>
-                  </div>
-                </Link>
-              ))}
-              {impayes.map(c => (
-                <Link key={c.id} href="/commercial/clients" className="block">
-                  <div className="bg-white rounded-xl p-3 border border-red-100 hover:border-red-200 transition-colors">
-                    <p className="text-xs font-semibold text-gray-800">{c.entreprise}</p>
-                    <p className="text-xs text-red-600 mt-0.5">Paiement impayé</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <>
+              <p className="mt-1 mb-3 text-xs text-gray-400">
+                Impayés et prospects sans contact depuis plus de 14 jours
+              </p>
+              <div className="-mx-2 max-h-96 overflow-y-auto">
+                {impayes.map(c => (
+                  <Link
+                    key={c.id}
+                    href="/commercial/clients"
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="min-w-0 truncate text-sm text-gray-800">{c.entreprise}</span>
+                    <span className="flex-shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      Impayé
+                    </span>
+                  </Link>
+                ))}
+                {overdueProspects.map(p => {
+                  const days = daysSince(p.dernierContact);
+                  return (
+                    <Link
+                      key={p.id}
+                      href="/commercial/prospects"
+                      title={`Pas de contact depuis ${days} jours`}
+                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="min-w-0 truncate text-sm text-gray-800">{p.entreprise}</span>
+                      <span
+                        className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                          days >= 30 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {days} j
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
