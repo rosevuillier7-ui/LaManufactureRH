@@ -275,7 +275,15 @@ export default function CommercialOverviewPage() {
             <h2 className="text-sm font-semibold text-gray-700">Prochaines actions</h2>
           </div>
           {todos.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Aucune action planifiée</p>
+            <div className="flex flex-col items-start gap-1 py-2">
+              <p className="text-sm text-gray-500">Aucune action planifiée</p>
+              <Link
+                href="/commercial/prospects"
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Ajouter un todo sur un prospect →
+              </Link>
+            </div>
           ) : (
             <div className="space-y-1">
               {todos.map(p => {
