@@ -185,7 +185,7 @@ export default function CommercialOverviewPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Pipeline bar chart */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-5">Pipeline prospects</h2>
@@ -211,7 +211,10 @@ export default function CommercialOverviewPage() {
         </div>
 
         {/* Urgences */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm">
+          {/* En lg, la carte est dimensionnée par la ligne de grille (= hauteur du
+              Pipeline) et le contenu remplit en absolu ; en mobile, flux normal capé. */}
+          <div className="flex max-h-96 flex-col p-6 lg:absolute lg:inset-0 lg:max-h-none">
           <div className="flex items-center gap-2">
             <ExclamationTriangleIcon className={`w-4 h-4 ${hasUrgences ? "text-red-500" : "text-gray-400"}`} />
             <h2 className="text-sm font-semibold text-gray-700">Urgences</h2>
@@ -228,7 +231,7 @@ export default function CommercialOverviewPage() {
               <p className="mt-1 mb-3 text-xs text-gray-400">
                 Impayés et prospects sans contact depuis plus de 14 jours
               </p>
-              <div className="-mx-2 max-h-96 overflow-y-auto">
+              <div className="-mx-2 min-h-0 flex-1 overflow-y-auto">
                 {impayes.map(c => (
                   <Link
                     key={c.id}
@@ -264,6 +267,7 @@ export default function CommercialOverviewPage() {
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
 
