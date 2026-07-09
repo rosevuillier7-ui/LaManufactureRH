@@ -74,8 +74,13 @@ function AbonnesChart({ stats }: { stats: InstagramStat[] }) {
   const sorted = [...stats].sort((a, b) => a.month.localeCompare(b.month));
   if (sorted.length < 2) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-        Ajoutez au moins 2 entrées pour voir l&apos;évolution
+      <div className="flex flex-col items-center justify-center gap-1 py-8">
+        <p className="text-sm text-gray-500">
+          Il faut au moins 2 mois de données pour tracer l&apos;évolution
+        </p>
+        <a href="#saisie-manuelle" className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+          Ajouter un mois dans la saisie manuelle ↓
+        </a>
       </div>
     );
   }
@@ -307,15 +312,18 @@ export default function InstagramPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">
-              Aucune donnée pour ce mois. Utilisez la saisie manuelle ci-dessous.
-            </p>
+            <div className="flex flex-col items-start gap-1 py-2">
+              <p className="text-sm text-gray-500">Aucune donnée pour ce mois</p>
+              <a href="#saisie-manuelle" className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                Renseigner le mois en cours ↓
+              </a>
+            </div>
           )}
         </div>
       </section>
 
       {/* Section 4 — Saisie manuelle */}
-      <section className="mb-10">
+      <section id="saisie-manuelle" className="mb-10 scroll-mt-6">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-semibold text-gray-900 mb-5">Saisie manuelle</h2>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -436,8 +444,11 @@ export default function InstagramPage() {
             <h2 className="text-base font-semibold text-gray-900">Historique</h2>
           </div>
           {sorted.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-400">
-              Aucune entrée pour le moment.
+            <div className="flex flex-col items-center gap-1 px-6 py-8">
+              <p className="text-sm text-gray-500">Aucune entrée pour le moment</p>
+              <p className="text-xs text-gray-400">
+                Chaque mois enregistré via la saisie manuelle apparaîtra ici
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
