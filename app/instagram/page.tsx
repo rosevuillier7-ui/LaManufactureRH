@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import StatCard from "@/components/StatCard";
 import {
   getAllInstagramStats,
   createInstagramStat,
@@ -12,7 +11,42 @@ import {
 import type { InstagramStat } from "@/lib/store";
 import { generateId } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
-import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  UsersIcon,
+  ChatBubbleLeftRightIcon,
+  PhoneArrowUpRightIcon,
+  UserPlusIcon,
+} from "@heroicons/react/24/outline";
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  icon,
+  tint,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  tint: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tint}`}>
+          {icon}
+        </div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider leading-tight">{label}</p>
+      </div>
+      <p className="text-3xl font-bold text-gray-900">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
 
@@ -180,30 +214,34 @@ export default function InstagramPage() {
 
       {/* Section 1 — KPIs */}
       <section className="mb-10">
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <KpiCard
             label="Abonnés"
             value={(latest?.abonnes ?? 0).toLocaleString("fr-FR")}
             sub={latest && previous ? getDelta(latest.abonnes, previous.abonnes) : undefined}
-            color="violet"
+            icon={<UsersIcon className="w-5 h-5 text-violet-600" />}
+            tint="bg-violet-50"
           />
-          <StatCard
+          <KpiCard
             label="DM reçus ce mois"
             value={currentMonthEntry?.dmsRecus ?? 0}
             sub={currentMonthEntry && prevMonthEntry ? getDelta(currentMonthEntry.dmsRecus, prevMonthEntry.dmsRecus) : undefined}
-            color="indigo"
+            icon={<ChatBubbleLeftRightIcon className="w-5 h-5 text-indigo-600" />}
+            tint="bg-indigo-50"
           />
-          <StatCard
+          <KpiCard
             label="DM → Call / RDV"
             value={currentMonthEntry?.dmsConvertis ?? 0}
             sub={currentMonthEntry && prevMonthEntry ? getDelta(currentMonthEntry.dmsConvertis, prevMonthEntry.dmsConvertis) : undefined}
-            color="emerald"
+            icon={<PhoneArrowUpRightIcon className="w-5 h-5 text-emerald-600" />}
+            tint="bg-emerald-50"
           />
-          <StatCard
+          <KpiCard
             label="Prospects générés"
             value={currentMonthEntry?.prospectsGeneres ?? 0}
             sub={currentMonthEntry && prevMonthEntry ? getDelta(currentMonthEntry.prospectsGeneres, prevMonthEntry.prospectsGeneres) : undefined}
-            color="amber"
+            icon={<UserPlusIcon className="w-5 h-5 text-amber-600" />}
+            tint="bg-amber-50"
           />
         </div>
         {(currentMonthEntry?.prospectsGeneres ?? 0) > 0 && (
