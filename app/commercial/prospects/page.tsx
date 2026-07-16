@@ -352,7 +352,7 @@ export default function ProspectsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
@@ -363,7 +363,7 @@ export default function ProspectsPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Responsable</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dernier contact</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Note</th>
-                <th className="px-5 py-3" />
+                <th className="px-5 py-3 w-[132px]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -414,8 +414,10 @@ export default function ProspectsPage() {
                         <span className="text-xs text-red-400 ml-1">({days}j)</span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-gray-400 max-w-xs truncate">{p.note}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 text-gray-400">
+                      <div className="truncate max-w-[160px]">{p.note}</div>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => relancer(p)}
