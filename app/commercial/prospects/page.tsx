@@ -9,8 +9,9 @@ import {
   removeProspect,
   getActionsForProspect,
   createProspectAction,
+  updateProspectOwner,
 } from "@/lib/db";
-import { Prospect, ProspectAction, ProspectStatus, ActionType, TypeService, generateId } from "@/lib/store";
+import { Prospect, ProspectAction, ProspectStatus, ProspectOwner, ActionType, TypeService, generateId } from "@/lib/store";
 import Badge from "@/components/Badge";
 import {
   PlusIcon,
@@ -45,6 +46,14 @@ const allStatusOptions: ProspectStatus[] = [
 ];
 
 const manualActionTypes: ActionType[] = ["Appel", "Email", "RDV", "Note"];
+
+// Palette "responsable" : noir / or / blanc cassé (charte vitrine)
+const OWNER_KEYS: ProspectOwner[] = ["flaubert", "claire"];
+const OWNER_LABELS: Record<ProspectOwner, string> = { flaubert: "Flaubert", claire: "Claire" };
+const ownerDot: Record<ProspectOwner, string> = {
+  flaubert: "bg-[#c9a96e]",
+  claire: "bg-gray-900",
+};
 
 const typeServiceVariant: Record<TypeService, "indigo" | "purple" | "blue" | "gray"> = {
   "Recrutement": "indigo",
@@ -126,6 +135,7 @@ export default function ProspectsPage() {
   const [editing, setEditing] = useState<Prospect | null>(null);
   const [form, setForm] = useState(emptyProspect());
   const [filter, setFilter] = useState<ProspectStatus | "tous">("tous");
+  const [ownerFilter, setOwnerFilter] = useState<ProspectOwner | "tous">("tous");
 
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [actions, setActions] = useState<ProspectAction[]>([]);
@@ -240,6 +250,12 @@ export default function ProspectsPage() {
     }
   }
 
+  async function reassign(p: Prospect, owner: ProspectOwner) {
+    await updateProspectOwner(p.id, owner);
+    if (selectedProspect?.id === p.id) setSelectedProspect({ ...p, owner });
+    await load();
+  }
+
   async function openPanel(p: Prospect) {
     setSelectedProspect(p);
     setAddActionForm(false);
@@ -270,9 +286,9 @@ export default function ProspectsPage() {
 
   if (loading) return null;
 
-  const filtered = filter === "tous"
-    ? prospects
-    : prospects.filter(p => p.statut === filter);
+  const filtered = prospects
+    .filter(p => filter === "tous" || p.statut === filter)
+    .filter(p => ownerFilter === "tous" || p.owner === ownerFilter);
 
   const isInactive = (p: Prospect) => p.statut === "Perdu";
   const isOverdue = (p: Prospect) => !isInactive(p) && daysSince(p.dernierContact) > 7;
@@ -300,7 +316,24 @@ export default function ProspectsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <button
+            onClick={() => setOwnerFilter("tous")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${ownerFilter === "tous" ? "bg-gray-900 border-gray-900 text-white" : "bg-[#faf7f2] border-[#e8e0d4] text-gray-700 hover:border-[#c9a96e]"}`}
+          >
+            Tous
+          </button>
+          {OWNER_KEYS.map(o => (
+            <button
+              key={o}
+              onClick={() => setOwnerFilter(o)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${ownerFilter === o ? "bg-gray-900 border-gray-900 text-white" : "bg-[#faf7f2] border-[#e8e0d4] text-gray-700 hover:border-[#c9a96e]"}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${ownerFilter === o ? "bg-[#c9a96e]" : ownerDot[o]}`} />
+              {OWNER_LABELS[o]}
+            </button>
+          ))}
+          <div className="w-px h-5 bg-gray-200 mx-1" />
           <button
             onClick={() => setFilter("tous")}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === "tous" ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
@@ -327,6 +360,7 @@ export default function ProspectsPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Poste</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Responsable</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dernier contact</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Note</th>
                 <th className="px-5 py-3" />
@@ -356,6 +390,21 @@ export default function ProspectsPage() {
                     <td className="px-5 py-4 text-gray-500">{p.posteContact}</td>
                     <td className="px-5 py-4">
                       <Badge label={p.statut} variant={statusVariant[p.statut]} />
+                    </td>
+                    <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${p.owner ? ownerDot[p.owner] : "bg-[#e8e0d4]"}`} />
+                        <select
+                          value={p.owner ?? ""}
+                          onChange={e => reassign(p, e.target.value as ProspectOwner)}
+                          className="text-sm text-gray-700 bg-transparent border border-transparent hover:border-[#c9a96e] rounded-lg px-1.5 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#c9a96e]"
+                        >
+                          <option value="" disabled>—</option>
+                          {OWNER_KEYS.map(o => (
+                            <option key={o} value={o}>{OWNER_LABELS[o]}</option>
+                          ))}
+                        </select>
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-gray-500">
                       <span className={overdue ? "text-red-500 font-medium" : ""}>
@@ -396,7 +445,7 @@ export default function ProspectsPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-gray-400 italic text-sm">
+                  <td colSpan={8} className="px-5 py-10 text-center text-gray-400 italic text-sm">
                     Aucun prospect
                   </td>
                 </tr>

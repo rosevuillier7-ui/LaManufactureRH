@@ -48,6 +48,8 @@ export interface Candidat {
 
 export type TypeService = "Recrutement" | "Coaching" | "Les deux" | "Autre";
 
+export type ProspectOwner = "flaubert" | "claire";
+
 export interface Prospect {
   id: string;
   entreprise: string;
@@ -71,6 +73,7 @@ export interface Prospect {
   todoDate?: string;
   statutPaiement?: string;
   signedAt?: string;
+  owner?: ProspectOwner;
 }
 
 export type ActionType = "contact" | "relance" | "statut" | "note" | "Appel" | "Email" | "RDV" | "Note";

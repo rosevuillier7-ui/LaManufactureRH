@@ -3,7 +3,7 @@
 
 import { supabase } from "./supabase";
 import type {
-  Prospect, ProspectStatus, ProspectAction, ActionType, TypeService,
+  Prospect, ProspectStatus, ProspectOwner, ProspectAction, ActionType, TypeService,
   Client, ClientStatus,
   Mission, MissionStatus,
   Candidat, CandidatStatus,
@@ -60,6 +60,7 @@ function fromDbProspect(row: any): Prospect {
     todoDate: nullable(row.todo_date),
     statutPaiement: str(row.statut_paiement) || "Payé",
     signedAt: nullable(row.signed_at),
+    owner: nullable(row.owner) as ProspectOwner | undefined,
   };
 }
 
@@ -86,6 +87,7 @@ function toDbProspect(p: Prospect) {
     todo_date: toNullable(p.todoDate),
     statut_paiement: p.statutPaiement ?? "Payé",
     signed_at: toNullable(p.signedAt),
+    owner: toNullable(p.owner),
   };
 }
 
@@ -128,6 +130,11 @@ export async function updateProspect(id: string, p: Prospect): Promise<void> {
 
 export async function removeProspect(id: string): Promise<void> {
   const { error } = await supabase.from("prospects").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateProspectOwner(id: string, owner: ProspectOwner): Promise<void> {
+  const { error } = await supabase.from("prospects").update({ owner }).eq("id", id);
   if (error) throw error;
 }
 
