@@ -1,0 +1,198 @@
+{
+  "system": {
+    "fps": 24,
+    "width": 720,
+    "height": 1280,
+    "palette": {
+      "creme": [
+        245,
+        235,
+        217
+      ],
+      "or": [
+        214,
+        160,
+        66
+      ],
+      "noir": [
+        26,
+        22,
+        19
+      ]
+    },
+    "fonts": {
+      "title": "fonts/Switzer-Black.otf",
+      "label": "fonts/Switzer-Medium.otf",
+      "script": "fonts/Ephesis.ttf"
+    },
+    "animation": {
+      "switzer_in": {
+        "dur": 0.4,
+        "rise": 20,
+        "ease": "out_cubic"
+      },
+      "script_in": {
+        "dur": 0.6,
+        "lead": 0.15,
+        "feather": 70,
+        "ease": "out_cubic"
+      },
+      "gold_shift": {
+        "dur": 0.2
+      },
+      "exit": {
+        "dur": 0.3,
+        "before_end": 0.5
+      }
+    },
+    "composition": {
+      "script_overlap": 0.18,
+      "script_offset_x": -26,
+      "script_ratio": 0.58
+    }
+  },
+  "clips": [
+    {
+      "id": "clip1",
+      "src": "src/clip1.mp4",
+      "note": "on te nomme / MANAGER",
+      "lockup": {
+        "script": {
+          "text": "on te nomme",
+          "color": "or",
+          "gold_from": "creme"
+        },
+        "title": {
+          "text": "MANAGER",
+          "color": "creme",
+          "size": 100,
+          "tracking": 2
+        },
+        "center_x": 360,
+        "title_top": 336,
+        "start": 1.1,
+        "gold_at": 4.12,
+        "script_offset_x": -14,
+        "script_ratio": 0.56
+      },
+      "patches": [
+        {
+          "box": [
+            44,
+            248,
+            708,
+            474
+          ],
+          "mode": "harmonic"
+        }
+      ]
+    },
+    {
+      "id": "clip2",
+      "src": "src/clip2.mp4",
+      "note": "tes / 100 PREMIERS JOURS",
+      "lockup": {
+        "script": {
+          "text": "tes",
+          "color": "or",
+          "gold_from": "noir"
+        },
+        "title": {
+          "text": "100 PREMIERS JOURS",
+          "color": "noir",
+          "size": 50,
+          "tracking": 1
+        },
+        "center_x": 360,
+        "title_top": 222,
+        "start": 0.6,
+        "gold_at": 2.08,
+        "script_offset_x": 6,
+        "script_overlap": 0.24,
+        "script_ratio": 0.88
+      },
+      "patches": [
+        {
+          "box": [
+            36,
+            1194,
+            254,
+            1232
+          ],
+          "mode": "flat"
+        }
+      ]
+    },
+    {
+      "id": "clip3",
+      "src": "src/clip3.mp4",
+      "note": "LEGITIMITE / EQUIPE / RESULTATS - un label par carte, cartes trackees",
+      "cards": {
+        "labels": [
+          "LÉGITIMITÉ",
+          "ÉQUIPE",
+          "RÉSULTATS"
+        ],
+        "color": "or",
+        "size": 27,
+        "tracking": 2.2,
+        "probe_row": 500,
+        "label_y": 662,
+        "patch_h": 54,
+        "ref_width": 189,
+        "start": 3.55,
+        "stagger": 0.15
+      }
+    },
+    {
+      "id": "clip4",
+      "src": "src/clip4.mp4",
+      "note": "commente / 100",
+      "lockup": {
+        "script": {
+          "text": "commente",
+          "color": "creme"
+        },
+        "title": {
+          "text": "100",
+          "color": "or",
+          "gold_from": "creme",
+          "size": 150,
+          "tracking": 2
+        },
+        "center_x": 360,
+        "title_top": 498,
+        "start": 2.2,
+        "gold_at": 4.21,
+        "rule": {
+          "y": 716,
+          "half_width": 118,
+          "thickness": 2,
+          "color": "or"
+        },
+        "script_offset_x": -20,
+        "script_ratio": 0.5
+      },
+      "patches": [
+        {
+          "box": [
+            48,
+            420,
+            672,
+            700
+          ],
+          "mode": "harmonic"
+        },
+        {
+          "box": [
+            168,
+            700,
+            552,
+            740
+          ],
+          "mode": "harmonic"
+        }
+      ]
+    }
+  ]
+}
